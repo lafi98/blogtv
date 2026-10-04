@@ -1,0 +1,24 @@
+---
+import Listing from '../../../components/Listing.astro';
+import { loadCategoryPage } from '../../../lib/categoryPage';
+
+const data = loadCategoryPage(Astro.params.slug, 1);
+if (!data) return new Response(null, { status: 404 });
+const { category: c } = data;
+---
+<Listing
+  title={c.seoTitle || `${c.name}: tutorials, patterns & tips`}
+  heading={c.name}
+  eyebrow="Category"
+  description={c.metaDescription || c.description}
+  lead={c.description}
+  introMd={c.introMd}
+  path={`/category/${c.slug}`}
+  base={`/category/${c.slug}`}
+  crumbs={[{ name: 'Home', path: '/' }, { name: 'Categories', path: '/categories' }, { name: c.name, path: `/category/${c.slug}` }]}
+  items={data.items}
+  page={1}
+  totalPages={data.totalPages}
+  categories={data.categories}
+  currentCategory={c.slug}
+/>

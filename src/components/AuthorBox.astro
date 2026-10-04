@@ -1,0 +1,21 @@
+---
+import type { Author } from '../lib/repos/authors';
+import { getImage } from '../lib/repos/images';
+interface Props {
+  author: Author;
+}
+const { author } = Astro.props;
+const avatar = getImage(author.avatarImageId);
+const initials = author.name.split(/\s+/).filter((w) => /^[A-Za-z]/.test(w)).slice(0, 2).map((w) => w[0]).join('');
+---
+<section class="author-box" aria-labelledby="author-heading">
+  <span class="avatar" aria-hidden="true">
+    {avatar ? <img src={`/media/${avatar.variants[0].file}`} alt="" width="64" height="64" loading="lazy" /> : initials}
+  </span>
+  <div>
+    <h2 id="author-heading">About {author.name}</h2>
+    {author.role && <p class="role">{author.role}</p>}
+    <p>{author.bio}</p>
+    <p><a href={`/about#author-${author.slug}`}>More about our editorial standards</a></p>
+  </div>
+</section>

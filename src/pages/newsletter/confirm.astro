@@ -1,0 +1,29 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { confirmSubscriber } from '../../lib/repos/subscribers';
+import { sha256 } from '../../lib/security/crypto';
+
+// GET shows a button; only POST confirms — so email link scanners can't subscribe people.
+const token = Astro.url.searchParams.get('token') ?? '';
+const valid = /^[A-Za-z0-9_-]{30,60}$/.test(token);
+let result: 'pending' | 'confirmed' | 'invalid' = valid ? 'pending' : 'invalid';
+if (Astro.request.method === 'POST' && valid) {
+  const fd = await Astro.request.formData();
+  const t = String(fd.get('token') ?? '');
+  result = t === token && confirmSubscriber(sha256(t)) ? 'confirmed' : 'invalid';
+}
+---
+<BaseLayout meta={{ title: 'Confirm subscription', description: 'Confirm your newsletter subscription.', path: '/newsletter/confirm', noindex: true }}>
+  <div class="wrap" style="padding-block:3rem 4rem;max-width:680px">
+    <h1>Confirm your subscription</h1>
+    {result === 'pending' && (
+      <form method="post">
+        <input type="hidden" name="token" value={token} />
+        <p>Click below to start receiving new crochet tutorials and patterns.</p>
+        <button class="btn btn-primary" type="submit">Yes, subscribe me</button>
+      </form>
+    )}
+    {result === 'confirmed' && <div class="notice notice--success" role="status">You're subscribed — thank you! <a href="/blog">Browse the latest articles</a>.</div>}
+    {result === 'invalid' && <div class="notice notice--error" role="alert">This confirmation link is invalid or has already been used. You can <a href="/newsletter">sign up again</a>.</div>}
+  </div>
+</BaseLayout>

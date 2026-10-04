@@ -1,0 +1,72 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getSettings, saveSettings } from '../../../lib/settings';
+import { setFlash } from '../../../lib/admin/flash';
+import { emailSchema } from '../../../lib/security/forms';
+import { audit } from '../../../lib/db';
+
+const site = getSettings('site');
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const str = (k: string, max: number) => String(fd.get(k) ?? '').trim().slice(0, max);
+  const email = str('contactEmail', 254);
+  const social = { pinterest: str('pinterest', 300), instagram: str('instagram', 300), youtube: str('youtube', 300), facebook: str('facebook', 300) };
+  const errors: string[] = [];
+  if (email && !emailSchema.safeParse(email).success) errors.push('Contact email is not valid.');
+  for (const [k, v] of Object.entries(social)) if (v && !/^https:\/\/\S+$/.test(v)) errors.push(`${k} must be an https:// URL.`);
+  const lastUpdated = str('legalLastUpdated', 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(lastUpdated)) errors.push('Legal "last updated" must be a date (YYYY-MM-DD).');
+  if (!str('name', 80)) errors.push('Site name is required.');
+  if (errors.length) setFlash(Astro.cookies, 'error', errors.join(' '));
+  else {
+    saveSettings('site', {
+      name: str('name', 80),
+      tagline: str('tagline', 120),
+      description: str('description', 300),
+      operatorName: str('operatorName', 150),
+      contactEmail: email,
+      jurisdiction: str('jurisdiction', 120),
+      postsPerPage: Math.min(30, Math.max(3, Number(fd.get('postsPerPage')) || 9)),
+      newsletterEnabled: fd.get('newsletterEnabled') === 'on',
+      legalLastUpdated: lastUpdated,
+      social,
+    });
+    audit('settings.site', { userId: Astro.locals.user!.id });
+    setFlash(Astro.cookies, 'success', 'Site settings saved.');
+  }
+  return Astro.redirect('/admin/settings', 303);
+}
+const csrf = Astro.locals.csrfToken;
+---
+<AdminLayout title="Site settings">
+  <h1>Site settings</h1>
+  <form method="post" class="card">
+    <input type="hidden" name="_csrf" value={csrf} />
+    <div class="grid grid-2">
+      <div class="field"><label for="name">Site name</label><input id="name" name="name" type="text" required value={site.name} /></div>
+      <div class="field"><label for="tagline">Tagline</label><input id="tagline" name="tagline" type="text" value={site.tagline} /></div>
+    </div>
+    <div class="field"><label for="description">Site description (homepage meta description)</label><textarea id="description" name="description" maxlength="300">{site.description}</textarea></div>
+    <h2>Legal details (used in Privacy Policy, Terms, footer)</h2>
+    <div class="grid grid-3">
+      <div class="field"><label for="operatorName">Operator / legal name</label><input id="operatorName" name="operatorName" type="text" value={site.operatorName} placeholder="Your name or company" /></div>
+      <div class="field"><label for="contactEmail">Contact email</label><input id="contactEmail" name="contactEmail" type="email" value={site.contactEmail} /></div>
+      <div class="field"><label for="jurisdiction">Governing law / jurisdiction</label><input id="jurisdiction" name="jurisdiction" type="text" value={site.jurisdiction} placeholder="e.g. England and Wales" /></div>
+    </div>
+    <div class="field" style="max-width:260px"><label for="legalLastUpdated">Legal pages “last updated”</label><input id="legalLastUpdated" name="legalLastUpdated" type="text" value={site.legalLastUpdated} pattern="\d{4}-\d{2}-\d{2}" /></div>
+    <p class="hint">Edit the policy texts themselves in <code>content/legal/*.md</code>. They are templates, not legal advice — have them reviewed for your situation.</p>
+    <h2>Display</h2>
+    <div class="grid grid-2">
+      <div class="field"><label for="postsPerPage">Articles per listing page</label><input id="postsPerPage" name="postsPerPage" type="number" min="3" max="30" value={site.postsPerPage} /></div>
+      <label class="check" style="align-self:end"><input type="checkbox" name="newsletterEnabled" checked={site.newsletterEnabled} /> Show newsletter sign-up forms</label>
+    </div>
+    <h2>Social profiles (https URLs, optional)</h2>
+    <div class="grid grid-2">
+      <div class="field"><label for="pinterest">Pinterest</label><input id="pinterest" name="pinterest" type="url" value={site.social.pinterest} /></div>
+      <div class="field"><label for="instagram">Instagram</label><input id="instagram" name="instagram" type="url" value={site.social.instagram} /></div>
+      <div class="field"><label for="youtube">YouTube</label><input id="youtube" name="youtube" type="url" value={site.social.youtube} /></div>
+      <div class="field"><label for="facebook">Facebook</label><input id="facebook" name="facebook" type="url" value={site.social.facebook} /></div>
+    </div>
+    <button class="btn btn-primary" type="submit">Save</button>
+  </form>
+</AdminLayout>

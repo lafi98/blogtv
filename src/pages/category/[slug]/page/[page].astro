@@ -1,0 +1,25 @@
+---
+import Listing from '../../../../components/Listing.astro';
+import { loadCategoryPage } from '../../../../lib/categoryPage';
+import { parsePage } from '../../../../lib/listing';
+
+const page = parsePage(Astro.params.page);
+const data = page === null ? null : loadCategoryPage(Astro.params.slug, page);
+if (!data || page === null) return new Response(null, { status: 404 });
+const { category: c } = data;
+---
+<Listing
+  title={c.seoTitle || `${c.name}: tutorials, patterns & tips`}
+  heading={c.name}
+  eyebrow="Category"
+  description={`${c.metaDescription || c.description} Page ${page}.`}
+  lead={c.description}
+  path={`/category/${c.slug}/page/${page}`}
+  base={`/category/${c.slug}`}
+  crumbs={[{ name: 'Home', path: '/' }, { name: 'Categories', path: '/categories' }, { name: c.name, path: `/category/${c.slug}` }, { name: `Page ${page}`, path: `/category/${c.slug}/page/${page}` }]}
+  items={data.items}
+  page={page}
+  totalPages={data.totalPages}
+  categories={data.categories}
+  currentCategory={c.slug}
+/>

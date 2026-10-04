@@ -1,0 +1,63 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { countUsers, login, setSessionCookie } from '../../lib/auth/session';
+import { randomToken, safeEqual } from '../../lib/security/crypto';
+import { clientIp, ipKey } from '../../lib/security/rateLimit';
+import { config } from '../../lib/config';
+
+if (Astro.locals.user) return Astro.redirect('/admin', 303);
+
+const CSRF_COOKIE = 'hh_login_csrf';
+let error = '';
+let email = '';
+const nextRaw = Astro.url.searchParams.get('next') ?? '/admin';
+const next = /^\/admin(\/[\w\-/?=&%.]*)?$/.test(nextRaw) ? nextRaw : '/admin';
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  email = String(fd.get('email') ?? '').slice(0, 254);
+  const password = String(fd.get('password') ?? '');
+  const cookieToken = Astro.cookies.get(CSRF_COOKIE)?.value ?? '';
+  const formToken = String(fd.get('_csrf') ?? '');
+  if (!cookieToken || !safeEqual(cookieToken, formToken)) {
+    error = 'Your sign-in form expired. Please try again.';
+  } else {
+    let ip = 'unknown';
+    try { ip = clientIp(Astro.request, Astro.clientAddress); } catch { /* ignore */ }
+    const res = login(email, password, ipKey(ip), Astro.request.headers.get('user-agent') ?? '');
+    if (res.ok) {
+      setSessionCookie(Astro.cookies, res.token);
+      Astro.cookies.delete(CSRF_COOKIE, { path: '/admin/login' });
+      return Astro.redirect(next, 303);
+    }
+    error = res.error;
+  }
+  Astro.response.status = 400;
+}
+const csrf = randomToken(24);
+Astro.cookies.set(CSRF_COOKIE, csrf, { httpOnly: true, sameSite: 'strict', secure: config.siteUrl.startsWith('https://'), path: '/admin/login', maxAge: 3600 });
+const noUsers = countUsers() === 0;
+---
+<AdminLayout title="Sign in">
+  <div class="login card">
+    <h1>Admin sign in</h1>
+    {noUsers && (
+      <div class="flash flash-error" role="alert">
+        No admin account exists yet. Create one on the server with <code>npm run admin:create</code> (see README). Accounts can't be created from the web for security reasons.
+      </div>
+    )}
+    {error && <div class="flash flash-error" role="alert">{error}</div>}
+    <form method="post">
+      <input type="hidden" name="_csrf" value={csrf} />
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="username" required value={email} />
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+      </div>
+      <button class="btn btn-primary" type="submit">Sign in</button>
+    </form>
+  </div>
+</AdminLayout>

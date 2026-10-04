@@ -1,0 +1,79 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import ValidationReport from '../../../components/admin/ValidationReport.astro';
+import { getRun, ACTIVE_RUN_STATUSES } from '../../../lib/repos/aiRuns';
+import { getArticle, getArticleBySlug } from '../../../lib/repos/articles';
+
+const id = Number(Astro.params.id);
+const run = Number.isInteger(id) && id > 0 ? getRun(id) : null;
+if (!run) return new Response('Run not found', { status: 404 });
+const active = ACTIVE_RUN_STATUSES.includes(run.status);
+const article = run.articleId ? getArticle(run.articleId) : null;
+const dupArticle = run.duplicateOfSlug ? getArticleBySlug(run.duplicateOfSlug) : null;
+const fmt = (iso: string | null) => (iso ? iso.replace('T', ' ').slice(0, 19) + ' UTC' : '—');
+const tone: Record<string, string> = {
+  PUBLISHED: 'pill-published', SCHEDULED: 'pill-scheduled', DRAFT: 'pill-draft', FAILED: 'pill-fail', SKIPPED_DUPLICATE: 'pill-warn',
+  QUEUED: 'pill-review', GENERATING: 'pill-review', VALIDATING: 'pill-review',
+};
+---
+<AdminLayout title={`AI run #${run.id}`} refresh={active ? 4 : undefined}>
+  <p><a href="/admin/topics">← AI Publisher</a></p>
+  <h1>“{run.keyword}” <span class={`pill ${tone[run.status]}`}>{run.status}</span></h1>
+  {active && <p class="flash flash-success" role="status">Working… this page refreshes automatically. Generation usually takes a few minutes.</p>}
+
+  {run.status === 'SKIPPED_DUPLICATE' && (
+    <section class="card" aria-labelledby="dup-h">
+      <h2 id="dup-h" style="margin-top:0">Not created — this topic already exists</h2>
+      <p>{run.duplicateReason}</p>
+      {dupArticle && (
+        <p class="toolbar">
+          <a class="btn" href={`/admin/articles/${dupArticle.id}`}>Open “{dupArticle.title}”</a>
+          {dupArticle.status === 'published' && <a class="btn" href={`/blog/${dupArticle.slug}`} target="_blank" rel="noopener">View on site ↗</a>}
+        </p>
+      )}
+      <p class="muted">No article was generated and no Claude cost was incurred{run.claudeStatus === 'ok' ? ' beyond the topic analysis' : ''}. Try a keyword with a more specific angle.</p>
+    </section>
+  )}
+
+  {run.status === 'FAILED' && (
+    <section class="card" aria-labelledby="err-h">
+      <h2 id="err-h" style="margin-top:0">Failed — nothing was published</h2>
+      <p class="flash flash-error">{run.error}</p>
+      <p class="muted">The keyword was not marked as used. Queue keywords are retried automatically (up to 3 attempts).</p>
+    </section>
+  )}
+
+  {run.status === 'DRAFT' && run.mode === 'publish' && (
+    <section class="card"><h2 style="margin-top:0">Saved as DRAFT — not published</h2><p>Validation found {run.validationErrors} error(s), listed below. Fix them in the editor, then publish — or delete the draft.</p></section>
+  )}
+
+  <div class="grid grid-2">
+    <section class="card" aria-labelledby="sum-h">
+      <h2 id="sum-h" style="margin-top:0">Summary</h2>
+      <table>
+        <tbody>
+          <tr><th>Mode</th><td>{run.mode === 'publish' ? 'Generate & Publish' : 'Generate Draft'} ({run.trigger})</td></tr>
+          <tr><th>Started</th><td>{fmt(run.startedAt)}</td></tr>
+          <tr><th>Completed</th><td>{fmt(run.completedAt)}</td></tr>
+          <tr><th>Claude</th><td>{run.claudeStatus}{run.claudeDetail && <> — {run.claudeDetail}</>}</td></tr>
+          <tr><th>Validation</th><td>{run.validationStatus ? `${run.validationStatus.toUpperCase()} — ${run.validationErrors} error(s), ${run.validationWarnings} warning(s)` : '—'}</td></tr>
+          <tr><th>Publication</th><td>{run.publicationResult}</td></tr>
+          <tr><th>Publishing day</th><td>{run.publishDay ?? '—'}</td></tr>
+          <tr><th>Tokens</th><td>{run.usage.input_tokens ?? 0} in / {run.usage.output_tokens ?? 0} out ({run.usage.calls ?? 0} request(s))</td></tr>
+          <tr><th>Article</th><td>{article ? (
+            <span class="toolbar">
+              <a href={`/admin/articles/${article.id}`}>{article.title}</a>
+              <a class="btn btn-small" href={`/admin/articles/${article.id}/preview`} target="_blank" rel="noopener">Preview ↗</a>
+              {article.status === 'published' && <a class="btn btn-small" href={`/blog/${article.slug}`} target="_blank" rel="noopener">View live ↗</a>}
+            </span>
+          ) : '—'}</td></tr>
+        </tbody>
+      </table>
+    </section>
+    <section class="card" aria-labelledby="log-h">
+      <h2 id="log-h" style="margin-top:0">Steps</h2>
+      {run.log.length ? <ol style="font-size:.9rem;padding-left:1.2rem">{run.log.map((l) => <li><code>{l.at.slice(11, 19)}</code> [{l.stage}] {l.message}</li>)}</ol> : <p class="muted">No steps recorded.</p>}
+    </section>
+  </div>
+  {run.validation && <ValidationReport report={run.validation} />}
+</AdminLayout>

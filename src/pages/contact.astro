@@ -1,0 +1,120 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import { getSettings } from '../lib/settings';
+import { config } from '../lib/config';
+import { breadcrumbLd } from '../lib/seo';
+import { insertMessage } from '../lib/repos/messages';
+import { sendEmail } from '../lib/email/send';
+import { clientIp, ipKey, rateLimit } from '../lib/security/rateLimit';
+import {
+  HONEYPOT_FIELD, checkFormToken, contactSchema, fieldErrors, formString, issueFormToken, looksLikeSpam, verifyTurnstile,
+} from '../lib/security/forms';
+
+const site = getSettings('site');
+let sent = false;
+let formError = '';
+let errors: Record<string, string> = {};
+let values = { name: '', email: '', subject: '', message: '' };
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  values = { name: formString(fd, 'name'), email: formString(fd, 'email'), subject: formString(fd, 'subject'), message: formString(fd, 'message') };
+  let ip = 'unknown';
+  try { ip = clientIp(Astro.request, Astro.clientAddress); } catch { /* not available */ }
+  const key = ipKey(ip);
+
+  if (formString(fd, HONEYPOT_FIELD)) {
+    sent = true; // bot filled the hidden field: pretend success, store nothing
+  } else if (!checkFormToken(formString(fd, 'form_token'))) {
+    formError = 'Your form expired or was sent too quickly. Please check your message and send it again.';
+    Astro.response.status = 400;
+  } else if (!rateLimit(`contact:${key}`, 5, 3600).ok) {
+    formError = 'You have sent several messages in a short time. Please try again in an hour.';
+    Astro.response.status = 429;
+  } else if (!(await verifyTurnstile(formString(fd, 'cf-turnstile-response'), ip))) {
+    formError = 'We could not verify that you are human. Please try again.';
+    Astro.response.status = 400;
+  } else {
+    const parsed = contactSchema.safeParse(values);
+    if (!parsed.success) {
+      errors = fieldErrors(parsed.error);
+      Astro.response.status = 400;
+    } else if (looksLikeSpam(`${parsed.data.subject} ${parsed.data.message}`)) {
+      sent = true; // silently drop obvious spam
+    } else {
+      insertMessage({ name: parsed.data.name, email: parsed.data.email, subject: parsed.data.subject, body: parsed.data.message });
+      if (config.email.contactNotifyTo) {
+        await sendEmail({
+          to: config.email.contactNotifyTo,
+          subject: `[${site.name}] New message: ${parsed.data.subject || '(no subject)'}`.slice(0, 200),
+          text: `From: ${parsed.data.name} <${parsed.data.email}>\n\n${parsed.data.message}`,
+          replyTo: parsed.data.email,
+        });
+      }
+      sent = true;
+      values = { name: '', email: '', subject: '', message: '' };
+    }
+  }
+}
+const token = issueFormToken();
+const crumbs = [{ name: 'Home', path: '/' }, { name: 'Contact', path: '/contact' }];
+const err = (f: string): { 'aria-invalid'?: 'true'; 'aria-describedby'?: string } =>
+  errors[f] ? { 'aria-invalid': 'true', 'aria-describedby': `${f}-error` } : {};
+---
+<BaseLayout meta={{ title: 'Contact', description: `Get in touch with ${site.name}: questions, corrections and ideas for crochet tutorials are welcome.`, path: '/contact' }} structuredData={[breadcrumbLd(crumbs)]}>
+  <div class="wrap" style="padding-bottom:4rem">
+    <Breadcrumbs items={crumbs} />
+    <header class="page-header">
+      <span class="eyebrow">Say hello</span>
+      <h1>Contact us</h1>
+      <p class="lead">Questions about a pattern, a correction, or an idea for a tutorial? We read every message.</p>
+    </header>
+    <div class="split" style="align-items:start">
+      <div>
+        {sent && <div class="notice notice--success" role="status"><strong>Thank you — your message has been sent.</strong> We usually reply within a few days.</div>}
+        {formError && <div class="notice notice--error" role="alert">{formError}</div>}
+        {Object.keys(errors).length > 0 && <div class="notice notice--error" role="alert">Please fix the highlighted fields below.</div>}
+        <form method="post" action="/contact" novalidate>
+          <input type="hidden" name="form_token" value={token} />
+          <div class="hp-field" aria-hidden="true">
+            <label for={`c-${HONEYPOT_FIELD}`}>Leave this field empty</label>
+            <input id={`c-${HONEYPOT_FIELD}`} type="text" name={HONEYPOT_FIELD} tabindex="-1" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label for="name">Your name</label>
+            <input id="name" name="name" type="text" required maxlength="100" autocomplete="name" value={values.name} {...err('name')} />
+            {errors.name && <p class="field-error" id="name-error">{errors.name}</p>}
+          </div>
+          <div class="field">
+            <label for="email">Email address</label>
+            <input id="email" name="email" type="email" required maxlength="254" autocomplete="email" value={values.email} {...err('email')} />
+            {errors.email && <p class="field-error" id="email-error">{errors.email}</p>}
+          </div>
+          <div class="field">
+            <label for="subject">Subject <span class="muted">(optional)</span></label>
+            <input id="subject" name="subject" type="text" maxlength="150" value={values.subject} {...err('subject')} />
+            {errors.subject && <p class="field-error" id="subject-error">{errors.subject}</p>}
+          </div>
+          <div class="field">
+            <label for="message">Message</label>
+            <textarea id="message" name="message" required maxlength="5000" {...err('message')}>{values.message}</textarea>
+            {errors.message && <p class="field-error" id="message-error">{errors.message}</p>}
+          </div>
+          {config.turnstile.enabled && <div class="cf-turnstile field" data-sitekey={config.turnstile.siteKey}></div>}
+          <p class="small-print">We use your details only to reply to you. See our <a href="/privacy-policy">Privacy Policy</a>.</p>
+          <button class="btn btn-primary" type="submit">Send message</button>
+        </form>
+      </div>
+      <div class="panel">
+        <h2 style="font-size:1.35rem">Before you write</h2>
+        <ul>
+          <li>Pattern question? Mention the article and the row or round you're on.</li>
+          <li>Found a mistake? Tell us where — we correct errors quickly.</li>
+          <li>We don't accept sponsored posts or paid links.</li>
+        </ul>
+        {site.contactEmail && <p>Prefer email? Write to <a href={`mailto:${site.contactEmail}`}>{site.contactEmail}</a>.</p>}
+      </div>
+    </div>
+  </div>
+</BaseLayout>

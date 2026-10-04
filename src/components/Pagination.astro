@@ -1,0 +1,28 @@
+---
+interface Props {
+  page: number;
+  totalPages: number;
+  /** Builds the URL for a page number. */
+  base: string;
+}
+const { page, totalPages, base } = Astro.props;
+const href = (n: number) => (n === 1 ? base : `${base}/page/${n}`);
+const pages: (number | '…')[] = [];
+for (let n = 1; n <= totalPages; n++) {
+  if (n === 1 || n === totalPages || Math.abs(n - page) <= 1) pages.push(n);
+  else if (pages[pages.length - 1] !== '…') pages.push('…');
+}
+---
+{totalPages > 1 && (
+  <nav class="pagination" aria-label="Pagination">
+    <ul>
+      {page > 1 && <li><a href={href(page - 1)} rel="prev">← Newer<span class="visually-hidden"> articles</span></a></li>}
+      {pages.map((p) =>
+        p === '…' ? <li><span class="gap" aria-hidden="true">…</span></li>
+        : p === page ? <li><span aria-current="page"><span class="visually-hidden">Page </span>{p}</span></li>
+        : <li><a href={href(p)}><span class="visually-hidden">Page </span>{p}</a></li>
+      )}
+      {page < totalPages && <li><a href={href(page + 1)} rel="next">Older<span class="visually-hidden"> articles</span> →</a></li>}
+    </ul>
+  </nav>
+)}

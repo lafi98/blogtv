@@ -1,0 +1,31 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { changePassword } from '../../lib/auth/session';
+import { setFlash } from '../../lib/admin/flash';
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const next = String(fd.get('next') ?? '');
+  if (next !== String(fd.get('confirm') ?? '')) setFlash(Astro.cookies, 'error', 'New passwords do not match.');
+  else {
+    const err = changePassword(Astro.locals.user!.id, String(fd.get('current') ?? ''), next);
+    if (err) setFlash(Astro.cookies, 'error', err);
+    else return Astro.redirect('/admin/login', 303);
+  }
+  return Astro.redirect('/admin/account', 303);
+}
+const csrf = Astro.locals.csrfToken;
+---
+<AdminLayout title="Account">
+  <h1>Account</h1>
+  <p>Signed in as <strong>{Astro.locals.user!.email}</strong>.</p>
+  <form method="post" class="card" style="max-width:520px">
+    <h2 style="margin-top:0">Change password</h2>
+    <input type="hidden" name="_csrf" value={csrf} />
+    <div class="field"><label for="current">Current password</label><input id="current" name="current" type="password" autocomplete="current-password" required /></div>
+    <div class="field"><label for="next">New password (12+ characters)</label><input id="next" name="next" type="password" autocomplete="new-password" minlength="12" required /></div>
+    <div class="field"><label for="confirm">Repeat new password</label><input id="confirm" name="confirm" type="password" autocomplete="new-password" minlength="12" required /></div>
+    <p class="hint">Changing your password signs out all sessions, including this one.</p>
+    <button class="btn btn-primary" type="submit">Change password</button>
+  </form>
+</AdminLayout>

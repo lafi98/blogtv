@@ -1,0 +1,44 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ArticleView from '../../components/ArticleView.astro';
+import { getPublishedBySlug, getRelatedCards } from '../../lib/repos/articles';
+import { getAuthor } from '../../lib/repos/authors';
+import { getImage } from '../../lib/repos/images';
+import { articleLd, breadcrumbLd, faqLd, ogImageFor } from '../../lib/seo';
+
+const slug = Astro.params.slug ?? '';
+const article = /^[a-z0-9-]{1,100}$/.test(slug) ? getPublishedBySlug(slug) : null;
+if (!article) return new Response(null, { status: 404 });
+
+const author = getAuthor(article.authorId);
+const image = getImage(article.featuredImageId);
+const related = getRelatedCards(article, 3);
+const crumbs = [
+  { name: 'Home', path: '/' },
+  { name: 'Blog', path: '/blog' },
+  ...(article.categorySlug ? [{ name: article.categoryName ?? '', path: `/category/${article.categorySlug}` }] : []),
+  { name: article.title, path: `/blog/${article.slug}` },
+];
+const structuredData: object[] = [articleLd(article, author, image), breadcrumbLd(crumbs)];
+if (article.faq.length >= 2) structuredData.push(faqLd(article.faq));
+---
+<BaseLayout
+  meta={{
+    title: article.seoTitle || article.title,
+    description: article.metaDescription || article.excerpt,
+    path: `/blog/${article.slug}`,
+    canonical: article.canonicalUrl || undefined,
+    image: ogImageFor(image),
+    type: 'article',
+    noindex: article.noindex,
+    publishedTime: article.publishedAt,
+    modifiedTime: article.contentUpdatedAt ?? article.publishedAt,
+    section: article.categoryName,
+    tags: article.tags,
+    ogTitle: article.ogTitle || article.seoTitle || article.title,
+    ogDescription: article.ogDescription || article.metaDescription || article.excerpt,
+  }}
+  structuredData={structuredData}
+>
+  <ArticleView article={article} author={author} image={image} related={related} adsEnabled={true} />
+</BaseLayout>

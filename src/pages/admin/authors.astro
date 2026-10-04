@@ -1,0 +1,66 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { deleteAuthor, listAuthors, upsertAuthor } from '../../lib/repos/authors';
+import { listImages, getImage } from '../../lib/repos/images';
+import { setFlash } from '../../lib/admin/flash';
+import { SLUG_RE, slugify } from '../../lib/content/text';
+import { audit } from '../../lib/db';
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const str = (k: string, max: number) => String(fd.get(k) ?? '').trim().slice(0, max);
+  const id = Number(fd.get('id')) || undefined;
+  if (fd.get('intent') === 'delete' && id) {
+    const r = deleteAuthor(id);
+    setFlash(Astro.cookies, r.ok ? 'success' : 'error', r.ok ? 'Author deleted.' : r.reason!);
+  } else {
+    const name = str('name', 100);
+    const slug = (str('slug', 80) || slugify(name)).toLowerCase();
+    const website = str('websiteUrl', 300);
+    const sameAs = str('sameAs', 2000).split(/\s+/).filter((u) => /^https:\/\/\S+$/.test(u)).slice(0, 10);
+    const avatar = Number(fd.get('avatarImageId')) || null;
+    if (!name || !SLUG_RE.test(slug)) setFlash(Astro.cookies, 'error', 'Name and a valid slug are required.');
+    else if (website && !/^https?:\/\/\S+$/.test(website)) setFlash(Astro.cookies, 'error', 'Website must be a full URL.');
+    else if (listAuthors().some((a) => a.slug === slug && a.id !== id)) setFlash(Astro.cookies, 'error', 'Slug already used.');
+    else {
+      const saved = upsertAuthor({ name, slug, role: str('role', 120), bio: str('bio', 1500), websiteUrl: website, sameAs, avatarImageId: avatar && getImage(avatar) ? avatar : null }, id);
+      audit(id ? 'author.updated' : 'author.created', { userId: Astro.locals.user!.id, entity: 'author', entityId: saved });
+      setFlash(Astro.cookies, 'success', `Saved ${name}.`);
+    }
+  }
+  return Astro.redirect('/admin/authors', 303);
+}
+const authors = listAuthors();
+const images = listImages(200);
+const csrf = Astro.locals.csrfToken;
+---
+<AdminLayout title="Authors">
+  <h1>Authors</h1>
+  <p class="muted">Use real people with their genuine crochet background. Readers (and Google's quality guidelines) value knowing who wrote a guide. Never invent credentials.</p>
+  {[...authors, null].map((a) => (
+    <details class="card">
+      <summary>{a ? <>{a.name} <span class="muted">· {a.role}</span></> : '+ Add an author'}</summary>
+      <form method="post" style="margin-top:1rem">
+        <input type="hidden" name="_csrf" value={csrf} />
+        {a && <input type="hidden" name="id" value={a.id} />}
+        <div class="grid grid-3">
+          <div class="field"><label for={`an-${a?.id ?? 'n'}`}>Name</label><input id={`an-${a?.id ?? 'n'}`} name="name" type="text" required value={a?.name ?? ''} /></div>
+          <div class="field"><label for={`as-${a?.id ?? 'n'}`}>Slug</label><input id={`as-${a?.id ?? 'n'}`} name="slug" type="text" value={a?.slug ?? ''} /></div>
+          <div class="field"><label for={`ar-${a?.id ?? 'n'}`}>Role</label><input id={`ar-${a?.id ?? 'n'}`} name="role" type="text" value={a?.role ?? ''} /></div>
+        </div>
+        <div class="field"><label for={`ab-${a?.id ?? 'n'}`}>Bio</label><textarea id={`ab-${a?.id ?? 'n'}`} name="bio" maxlength="1500">{a?.bio ?? ''}</textarea></div>
+        <div class="grid grid-3">
+          <div class="field"><label for={`aw-${a?.id ?? 'n'}`}>Website</label><input id={`aw-${a?.id ?? 'n'}`} name="websiteUrl" type="url" value={a?.websiteUrl ?? ''} /></div>
+          <div class="field"><label for={`ap-${a?.id ?? 'n'}`}>Profiles (https URLs, space-separated)</label><input id={`ap-${a?.id ?? 'n'}`} name="sameAs" type="text" value={a?.sameAs.join(' ') ?? ''} /></div>
+          <div class="field"><label for={`ai-${a?.id ?? 'n'}`}>Avatar image</label>
+            <select id={`ai-${a?.id ?? 'n'}`} name="avatarImageId"><option value="">— None (initials) —</option>{images.map((i) => <option value={i.id} selected={i.id === a?.avatarImageId}>{i.alt.slice(0, 60)}</option>)}</select>
+          </div>
+        </div>
+        <div class="toolbar">
+          <button class="btn btn-primary" type="submit" name="intent" value="save">Save</button>
+          {a && <button class="btn btn-danger" type="submit" name="intent" value="delete" data-confirm="Delete this author?">Delete</button>}
+        </div>
+      </form>
+    </details>
+  ))}
+</AdminLayout>

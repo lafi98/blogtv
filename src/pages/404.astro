@@ -1,0 +1,17 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SearchForm from '../components/SearchForm.astro';
+import CategoryTiles from '../components/CategoryTiles.astro';
+import { listCategories } from '../lib/repos/categories';
+const categories = listCategories().filter((c) => (c.publishedCount ?? 0) > 0).slice(0, 6);
+---
+<BaseLayout meta={{ title: 'Page not found', description: 'The page you were looking for could not be found.', path: '/404', noindex: true }}>
+  <div class="wrap" style="padding-block:3rem 4rem">
+    <span class="eyebrow">Error 404</span>
+    <h1>We dropped a stitch</h1>
+    <p class="lead">The page you're looking for has moved or doesn't exist. Try a search, or pick a topic below.</p>
+    <SearchForm id="nf-q" />
+    <p style="margin-top:1.25rem"><a href="/">Go to the homepage</a> · <a href="/blog">All articles</a></p>
+    {categories.length > 0 && <div style="margin-top:2.5rem"><CategoryTiles categories={categories} /></div>}
+  </div>
+</BaseLayout>

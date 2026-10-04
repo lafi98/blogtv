@@ -1,0 +1,44 @@
+{
+  "name": "hook-and-hearth",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Crochet blog: Astro SSR + SQLite, admin dashboard, consent-gated ads/analytics, validated AI publishing pipeline.",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "start": "NODE_ENV=production node --env-file-if-exists=.env ./dist/server/entry.mjs",
+    "preview": "astro preview",
+    "check": "astro check",
+    "db:migrate": "tsx scripts/db-migrate.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "admin:create": "tsx scripts/create-admin.ts",
+    "content:import": "tsx scripts/import-article.ts",
+    "content:validate": "tsx scripts/validate-content.ts",
+    "publish:due": "tsx scripts/publish-due.ts",
+    "assets:generate": "tsx scripts/generate-assets.ts",
+    "qa": "tsx scripts/qa-site.ts",
+    "publish:daily": "tsx scripts/publish-daily.ts",
+    "test": "tsx --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "@astrojs/node": "^11.1.6",
+    "@fontsource-variable/fraunces": "^5.3.0",
+    "astro": "^7.3.5",
+    "better-sqlite3": "^13.0.3",
+    "markdown-it": "^15.0.2",
+    "sharp": "^0.35.5",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@types/better-sqlite3": "^9.6.0",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3"
+  }
+}

@@ -1,0 +1,72 @@
+---
+/** "Daily AI Publisher" status panel (dashboard + AI Publisher page). */
+import { getSlot, lastRun, activeRuns, countAiPublished, getCronState } from '../../lib/repos/aiRuns';
+import { nextQueuedKeyword, queuedKeywords } from '../../lib/repos/keywords';
+import { getArticle } from '../../lib/repos/articles';
+import { aiConfigError, MAX_AI_PUBLICATIONS_PER_DAY, publishingClock, simulationEnabled } from '../../lib/publishing/publisher';
+
+interface Props {
+  compact?: boolean;
+}
+const { compact = false } = Astro.props;
+const clock = publishingClock();
+const slot = getSlot(clock.day);
+const todayArticle = slot?.articleId ? getArticle(slot.articleId) : null;
+const queue = queuedKeywords();
+const next = nextQueuedKeyword();
+const lastSuccess = lastRun("status IN ('PUBLISHED','SCHEDULED')");
+const lastError = lastRun("status = 'FAILED'");
+const active = activeRuns()[0] ?? null;
+const cron = getCronState();
+const cfg = aiConfigError();
+const csrf = Astro.locals.csrfToken;
+const fmt = (iso: string | null | undefined) => (iso ? iso.slice(0, 16).replace('T', ' ') + ' UTC' : '—');
+---
+<section class="card" aria-labelledby="dap-h">
+  <div class="toolbar" style="margin-bottom:.4rem">
+    <h2 id="dap-h" style="margin:0">Daily AI Publisher</h2>
+    <span class={`pill ${clock.enabled ? 'pill-published' : 'pill-draft'}`}>{clock.enabled ? 'ON' : 'OFF'}</span>
+    {simulationEnabled() && <span class="pill pill-review">SIMULATION (no Claude calls)</span>}
+    <span class="spacer"></span>
+    <form method="post" action="/admin/topics">
+      <input type="hidden" name="_csrf" value={csrf} />
+      <input type="hidden" name="back" value={Astro.url.pathname} />
+      {clock.enabled
+        ? <button class="btn btn-small" name="intent" value="pause">Pause Daily Publishing</button>
+        : <button class="btn btn-small btn-primary" name="intent" value="resume">Resume Daily Publishing</button>}
+    </form>
+  </div>
+  {cfg && <p class="flash flash-error" role="alert"><strong>Configuration needed:</strong> {cfg.message}</p>}
+  <dl class="grid grid-2" style="margin:0">
+    <div>
+      <dt class="muted">Today's publication ({clock.day}, {clock.timezone})</dt>
+      <dd style="margin:0 0 .6rem">
+        {slot?.status === 'published' && todayArticle ? <>Published — <a href={`/admin/articles/${todayArticle.id}`}>{todayArticle.title}</a></>
+          : slot?.status === 'scheduled' && todayArticle ? <>Scheduled — <a href={`/admin/articles/${todayArticle.id}`}>{todayArticle.title}</a></>
+          : active ? <>In progress — <a href={`/admin/runs/${active.id}`}>run #{active.id} “{active.keyword}”</a></>
+          : <>Not published{clock.enabled && clock.time < clock.publishTime ? ` — publishing time is ${clock.publishTime}` : ''}{slot && slot.attempts > 0 ? ` (${slot.attempts} attempt(s) today)` : ''}</>}
+      </dd>
+      <dt class="muted">Next keyword</dt>
+      <dd style="margin:0 0 .6rem">{next ? <strong>{next.keyword}</strong> : 'Queue is empty — add keywords'}</dd>
+      <dt class="muted">Queue</dt>
+      <dd style="margin:0 0 .6rem">{queue.length} keyword(s) waiting{queue.length > 0 && !compact && <> · about {queue.length} day(s) of articles</>}</dd>
+    </div>
+    <div>
+      <dt class="muted">Last successful publication</dt>
+      <dd style="margin:0 0 .6rem">{lastSuccess ? <><a href={`/admin/runs/${lastSuccess.id}`}>{lastSuccess.keyword}</a> · {fmt(lastSuccess.completedAt)}</> : '—'}</dd>
+      <dt class="muted">Last error</dt>
+      <dd style="margin:0 0 .6rem">{lastError ? <><a href={`/admin/runs/${lastError.id}`}>{lastError.keyword}</a>: {lastError.error.slice(0, 160)}</> : '—'}</dd>
+      <dt class="muted">Articles published by AI</dt>
+      <dd style="margin:0 0 .6rem">{countAiPublished()} · limit {MAX_AI_PUBLICATIONS_PER_DAY} per day</dd>
+      <dt class="muted">Last scheduler call</dt>
+      <dd style="margin:0">{cron ? <>{fmt(cron.at)} — {cron.result}{cron.reason && ` (${cron.reason})`}</> : 'Never — configure your host’s cron (Settings → Automation)'}</dd>
+    </div>
+  </dl>
+  {compact && (
+    <p style="margin:.8rem 0 0" class="toolbar">
+      <a class="btn btn-small" href="/admin/topics#add">Add Keyword</a>
+      <a class="btn btn-small" href="/admin/topics#manual">Generate Draft</a>
+      <a class="btn btn-small btn-primary" href="/admin/topics#manual">Generate &amp; Publish</a>
+    </p>
+  )}
+</section>

@@ -1,0 +1,38 @@
+---
+import type { ValidationReport } from '../../lib/publishing/validator';
+interface Props {
+  report: ValidationReport | null;
+}
+const { report } = Astro.props;
+const order = { error: 0, warning: 1, info: 2 } as const;
+const checks = report ? [...report.checks].sort((a, b) => order[a.level] - order[b.level]) : [];
+---
+<section class="card" aria-labelledby="validation-heading">
+  <h2 id="validation-heading" style="margin-top:0">Quality &amp; policy checks</h2>
+  {!report ? (
+    <p class="muted">Not validated yet. Use “Save &amp; validate”.</p>
+  ) : (
+    <>
+      <p>
+        <span class={`pill pill-${report.status}`}>{report.status.toUpperCase()}</span>
+        {' '}{report.errors} errors · {report.warnings} warnings
+        <br /><small class="muted">Checked {report.checkedAt.replace('T', ' ').slice(0, 16)} UTC</small>
+      </p>
+      <p class="muted" style="font-size:.85rem">
+        {report.metrics.wordCount} words · reading ease {report.metrics.readingEase} · avg sentence {report.metrics.avgSentenceWords} words
+        {report.metrics.maxSimilarity && <> · max overlap {Math.round(report.metrics.maxSimilarity.score * 100)}% ({report.metrics.maxSimilarity.slug})</>}
+        {report.metrics.topPhrase && <> · top phrase “{report.metrics.topPhrase.phrase}” {report.metrics.topPhrase.density}%</>}
+      </p>
+      {checks.length === 0 ? <p>All checks passed.</p> : (
+        <ul class="checks">
+          {checks.map((c) => (
+            <li class={c.level}>
+              <strong>{c.level === 'error' ? 'Error' : c.level === 'warning' ? 'Warning' : 'Note'}:</strong> {c.message}
+              {c.details?.map((d) => <small>{d}</small>)}
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  )}
+</section>

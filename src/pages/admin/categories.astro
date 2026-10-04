@@ -1,0 +1,61 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { deleteCategory, listCategories, upsertCategory } from '../../lib/repos/categories';
+import { setFlash } from '../../lib/admin/flash';
+import { SLUG_RE, slugify } from '../../lib/content/text';
+import { audit } from '../../lib/db';
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const str = (k: string, max: number) => String(fd.get(k) ?? '').trim().slice(0, max);
+  const id = Number(fd.get('id')) || undefined;
+  if (fd.get('intent') === 'delete' && id) {
+    const r = deleteCategory(id);
+    setFlash(Astro.cookies, r.ok ? 'success' : 'error', r.ok ? 'Category deleted.' : r.reason!);
+  } else {
+    const name = str('name', 80);
+    const slug = (str('slug', 80) || slugify(name)).toLowerCase();
+    if (!name || !SLUG_RE.test(slug)) setFlash(Astro.cookies, 'error', 'Name and a valid slug are required.');
+    else if (listCategories().some((c) => c.slug === slug && c.id !== id)) setFlash(Astro.cookies, 'error', `Slug "${slug}" is already used.`);
+    else {
+      const saved = upsertCategory(
+        { name, slug, description: str('description', 400), introMd: str('introMd', 5000), seoTitle: str('seoTitle', 120), metaDescription: str('metaDescription', 300), sortOrder: Number(fd.get('sortOrder')) || 0 },
+        id,
+      );
+      audit(id ? 'category.updated' : 'category.created', { userId: Astro.locals.user!.id, entity: 'category', entityId: saved });
+      setFlash(Astro.cookies, 'success', `Saved “${name}”.`);
+    }
+  }
+  return Astro.redirect('/admin/categories', 303);
+}
+const categories = listCategories();
+const csrf = Astro.locals.csrfToken;
+---
+<AdminLayout title="Categories">
+  <h1>Categories</h1>
+  <p class="muted">Each category page shows its description and optional intro text — write a genuinely useful intro so category pages aren't thin.</p>
+  {[...categories, null].map((c) => (
+    <details class="card" open={c === null ? undefined : undefined}>
+      <summary>{c ? <>{c.name} <span class="muted">· /category/{c.slug} · {c.publishedCount} published</span></> : '+ Add a category'}</summary>
+      <form method="post" style="margin-top:1rem">
+        <input type="hidden" name="_csrf" value={csrf} />
+        {c && <input type="hidden" name="id" value={c.id} />}
+        <div class="grid grid-3">
+          <div class="field"><label for={`n-${c?.id ?? 'new'}`}>Name</label><input id={`n-${c?.id ?? 'new'}`} name="name" type="text" required value={c?.name ?? ''} /></div>
+          <div class="field"><label for={`s-${c?.id ?? 'new'}`}>Slug</label><input id={`s-${c?.id ?? 'new'}`} name="slug" type="text" value={c?.slug ?? ''} /></div>
+          <div class="field"><label for={`o-${c?.id ?? 'new'}`}>Sort order</label><input id={`o-${c?.id ?? 'new'}`} name="sortOrder" type="number" value={c?.sortOrder ?? 0} /></div>
+        </div>
+        <div class="field"><label for={`d-${c?.id ?? 'new'}`}>Description (1–2 sentences)</label><textarea id={`d-${c?.id ?? 'new'}`} name="description" maxlength="400">{c?.description ?? ''}</textarea></div>
+        <div class="field"><label for={`i-${c?.id ?? 'new'}`}>Intro (Markdown, optional)</label><textarea id={`i-${c?.id ?? 'new'}`} name="introMd" maxlength="5000">{c?.introMd ?? ''}</textarea></div>
+        <div class="grid grid-2">
+          <div class="field"><label for={`t-${c?.id ?? 'new'}`}>SEO title</label><input id={`t-${c?.id ?? 'new'}`} name="seoTitle" type="text" value={c?.seoTitle ?? ''} /></div>
+          <div class="field"><label for={`m-${c?.id ?? 'new'}`}>Meta description</label><input id={`m-${c?.id ?? 'new'}`} name="metaDescription" type="text" value={c?.metaDescription ?? ''} /></div>
+        </div>
+        <div class="toolbar">
+          <button class="btn btn-primary" type="submit" name="intent" value="save">Save</button>
+          {c && <button class="btn btn-danger" type="submit" name="intent" value="delete" data-confirm="Delete this category?">Delete</button>}
+        </div>
+      </form>
+    </details>
+  ))}
+</AdminLayout>

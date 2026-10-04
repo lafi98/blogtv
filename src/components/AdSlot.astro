@@ -1,0 +1,40 @@
+---
+/**
+ * <AdSlot position="top" | "in-content" | "sidebar" | "bottom" />
+ *
+ * Renders NOTHING unless ads are fully configured and enabled (see src/lib/ads), so the
+ * page layout and content are identical with ads switched off. When live, the unit is
+ * labelled "Advertisement" and visually separated from content. The AdSense script is
+ * loaded by the consent controller, never directly here.
+ */
+import { adRuntime, slotState } from '../lib/ads';
+import type { AdPosition } from '../lib/settings';
+
+interface Props {
+  position: AdPosition;
+  /** Page-level eligibility (false on legal pages, search, contact, errors, admin). */
+  enabled?: boolean;
+}
+const { position, enabled = true } = Astro.props;
+const rt = adRuntime();
+const state = enabled ? slotState(rt, position) : 'off';
+---
+{state === 'live' && (
+  <aside class={`ad-slot ad-slot--${position}`} aria-label="Advertisement">
+    <span class="ad-label">Advertisement</span>
+    <ins
+      class="adsbygoogle"
+      style="display:block"
+      data-ad-client={rt.clientId}
+      data-ad-slot={rt.slots[position]}
+      data-ad-format={position === 'sidebar' ? 'vertical' : 'auto'}
+      data-full-width-responsive={position === 'sidebar' ? 'false' : 'true'}
+    ></ins>
+  </aside>
+)}
+{state === 'placeholder' && (
+  <aside class={`ad-slot ad-slot--${position} ad-slot--placeholder`} aria-label="Advertisement placeholder">
+    <span class="ad-label">Advertisement</span>
+    <div class="ad-box">Ad slot “{position}” — placeholder (development only)</div>
+  </aside>
+)}

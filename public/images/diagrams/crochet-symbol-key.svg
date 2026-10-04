@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" role="img" aria-labelledby="t d">
+  <title id="t">Crochet chart symbol key</title>
+  <desc id="d">Standard chart symbols: chain is an oval, slip stitch a small filled dot, single crochet an X, half double crochet a T, double crochet a T with one slash, treble crochet a T with two slashes. UK names are shown under each.</desc>
+  <style>
+    .card{fill:#fffdf9;stroke:#e5d9ca;stroke-width:2}
+    .sym{fill:none;stroke:#2d2420;stroke-width:5;stroke-linecap:round}
+    .name{font:600 17px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#2d2420}
+    .uk{font:400 15px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#675850}
+    .title{font:700 22px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#2d2420}
+    .note{font:400 13px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#675850}
+  </style>
+  <rect width="760" height="440" fill="#faf6f0"/>
+  <text x="380" y="38" text-anchor="middle" class="title">Crochet chart symbols (US terms)</text>
+  <!-- row 1 -->
+  <rect class="card" x="20" y="60" width="230" height="160" rx="14"/>
+  <ellipse class="sym" cx="135" cy="110" rx="30" ry="15"/>
+  <text x="135" y="175" text-anchor="middle" class="name">Chain (ch)</text>
+  <text x="135" y="200" text-anchor="middle" class="uk">UK: chain (ch)</text>
+
+  <rect class="card" x="265" y="60" width="230" height="160" rx="14"/>
+  <ellipse cx="380" cy="110" rx="12" ry="8" fill="#2d2420"/>
+  <text x="380" y="175" text-anchor="middle" class="name">Slip stitch (sl st)</text>
+  <text x="380" y="200" text-anchor="middle" class="uk">UK: slip stitch (ss)</text>
+
+  <rect class="card" x="510" y="60" width="230" height="160" rx="14"/>
+  <path class="sym" d="M605 90 L645 130 M645 90 L605 130"/>
+  <text x="625" y="175" text-anchor="middle" class="name">Single crochet (sc)</text>
+  <text x="625" y="200" text-anchor="middle" class="uk">UK: double crochet (dc)</text>
+  <!-- row 2 -->
+  <rect class="card" x="20" y="235" width="230" height="170" rx="14"/>
+  <path class="sym" d="M110 265 L160 265 M135 265 L135 320"/>
+  <text x="135" y="358" text-anchor="middle" class="name">Half double crochet (hdc)</text>
+  <text x="135" y="383" text-anchor="middle" class="uk">UK: half treble (htr)</text>
+
+  <rect class="card" x="265" y="235" width="230" height="170" rx="14"/>
+  <path class="sym" d="M355 255 L405 255 M380 255 L380 330 M366 300 L394 284"/>
+  <text x="380" y="358" text-anchor="middle" class="name">Double crochet (dc)</text>
+  <text x="380" y="383" text-anchor="middle" class="uk">UK: treble (tr)</text>
+
+  <rect class="card" x="510" y="235" width="230" height="170" rx="14"/>
+  <path class="sym" d="M600 250 L650 250 M625 250 L625 335 M611 286 L639 270 M611 306 L639 290"/>
+  <text x="625" y="358" text-anchor="middle" class="name">Treble crochet (tr)</text>
+  <text x="625" y="383" text-anchor="middle" class="uk">UK: double treble (dtr)</text>
+
+  <text x="380" y="428" text-anchor="middle" class="note">Each slash on the post = one extra yarn over. Some charts draw single crochet as + instead of ×.</text>
+</svg>

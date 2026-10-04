@@ -1,0 +1,18 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import ArticleView from '../../../../components/ArticleView.astro';
+import { getArticle, getRelatedCards } from '../../../../lib/repos/articles';
+import { getAuthor } from '../../../../lib/repos/authors';
+import { getImage } from '../../../../lib/repos/images';
+
+const id = Number(Astro.params.id);
+const article = Number.isInteger(id) && id > 0 ? getArticle(id) : null;
+if (!article) return new Response('Article not found', { status: 404 });
+const image = getImage(article.featuredImageId);
+---
+<BaseLayout
+  meta={{ title: `Preview: ${article.title}`, description: article.metaDescription || article.excerpt, path: `/blog/${article.slug}`, noindex: true }}
+  draftBanner={`Preview — status: ${article.status}. Ads are disabled in previews.`}
+>
+  <ArticleView article={article} author={getAuthor(article.authorId)} image={image} related={getRelatedCards(article, 3)} adsEnabled={false} preview />
+</BaseLayout>

@@ -1,0 +1,63 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getSettings, saveSettings } from '../../../lib/settings';
+import { setFlash } from '../../../lib/admin/flash';
+import { absoluteUrl, config } from '../../../lib/config';
+import { audit } from '../../../lib/db';
+import { isValidTimeZone, TIME_RE, localDateTime } from '../../../lib/publishing/time';
+import { aiConfigError, MAX_AI_PUBLICATIONS_PER_DAY, simulationEnabled } from '../../../lib/publishing/publisher';
+import { getCronState } from '../../../lib/repos/aiRuns';
+
+const a = getSettings('automation');
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const publishTime = String(fd.get('publishTime') ?? '').trim();
+  const timezone = String(fd.get('timezone') ?? '').trim();
+  const errors: string[] = [];
+  if (!TIME_RE.test(publishTime)) errors.push('Publishing time must be HH:MM (24-hour).');
+  if (!isValidTimeZone(timezone)) errors.push(`Unknown time zone "${timezone}".`);
+  if (errors.length) setFlash(Astro.cookies, 'error', errors.join(' '));
+  else {
+    const dailyEnabled = fd.get('dailyEnabled') === 'on';
+    saveSettings('automation', { dailyEnabled, publishTime, timezone, checkExternalLinks: fd.get('checkExternalLinks') === 'on' });
+    audit('settings.automation', { userId: Astro.locals.user!.id, details: `daily=${dailyEnabled} ${publishTime} ${timezone}` });
+    setFlash(Astro.cookies, 'success', 'Automation settings saved.');
+  }
+  return Astro.redirect('/admin/settings/automation', 303);
+}
+const zones = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : ['UTC'];
+if (!zones.includes('UTC')) zones.unshift('UTC');
+const local = localDateTime(new Date(), a.timezone);
+const cron = getCronState();
+const cfg = aiConfigError();
+const endpoint = absoluteUrl('/api/cron/daily-publish');
+const csrf = Astro.locals.csrfToken;
+---
+<AdminLayout title="Automation">
+  <h1>Automation — Daily AI publishing</h1>
+  {cfg && <p class="flash flash-error" role="alert"><strong>Configuration needed:</strong> {cfg.message}</p>}
+  <form method="post" class="card">
+    <input type="hidden" name="_csrf" value={csrf} />
+    <label class="check"><input type="checkbox" name="dailyEnabled" checked={a.dailyEnabled} /> <span><strong>Daily publishing ON</strong><br /><small class="muted">Every day the scheduler takes the next keyword from the queue, generates and validates the article, and publishes it only if validation passes. When OFF, the cron endpoint does nothing.</small></span></label>
+    <div class="grid grid-3" style="margin-top:1rem">
+      <div class="field"><label for="publishTime">Publishing time</label><input id="publishTime" name="publishTime" type="time" required value={a.publishTime} /></div>
+      <div class="field">
+        <label for="timezone">Time zone</label>
+        <select id="timezone" name="timezone">{zones.map((z) => <option value={z} selected={z === a.timezone}>{z}</option>)}</select>
+      </div>
+      <div class="field"><label>Articles per day</label><p style="margin:.4rem 0"><strong>{MAX_AI_PUBLICATIONS_PER_DAY}</strong> <small class="muted">(hard server-side limit)</small></p></div>
+    </div>
+    <p class="hint">Local time in {a.timezone} now: {local.day} {local.time}. The first scheduler call at or after {a.publishTime} publishes that day's article.</p>
+    <label class="check"><input type="checkbox" name="checkExternalLinks" checked={a.checkExternalLinks} /> Check external links live during validation</label>
+    <p style="margin-top:1rem"><button class="btn btn-primary" type="submit">Save</button></p>
+  </form>
+
+  <section class="card" aria-labelledby="cron-h">
+    <h2 id="cron-h" style="margin-top:0">Scheduler (configure once on your host)</h2>
+    <p>Have your hosting provider call this URL every 15 minutes (any interval up to hourly works — the app decides when to publish):</p>
+    <p><code>GET or POST {endpoint}</code><br /><code>Authorization: Bearer $CRON_SECRET</code></p>
+    <p>CRON_SECRET on this server: <strong>{config.cronSecret.length >= 24 ? 'configured' : 'NOT configured — the endpoint refuses to run'}</strong>. Claude: <strong>{cfg ? 'not configured' : simulationEnabled() ? 'simulation mode' : `configured (${config.ai.model})`}</strong>.</p>
+    <p>Command-based schedulers can run <code>npm run publish:daily</code> instead. Step-by-step examples for common hosts are in <code>docs/PUBLISHING.md</code>.</p>
+    <p class="muted">Last scheduler call: {cron ? `${cron.at.replace('T', ' ').slice(0, 16)} UTC — ${cron.result}${cron.reason ? ` (${cron.reason})` : ''}` : 'never'}</p>
+  </section>
+</AdminLayout>

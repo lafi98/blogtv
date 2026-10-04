@@ -1,0 +1,72 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import NewsletterForm from '../../components/NewsletterForm.astro';
+import { getSettings } from '../../lib/settings';
+import { absoluteUrl } from '../../lib/config';
+import { findSubscriber, upsertPendingSubscriber } from '../../lib/repos/subscribers';
+import { sendEmail } from '../../lib/email/send';
+import { randomToken, sha256 } from '../../lib/security/crypto';
+import { clientIp, ipKey, rateLimit } from '../../lib/security/rateLimit';
+import { HONEYPOT_FIELD, checkFormToken, fieldErrors, formString, newsletterSchema, verifyTurnstile } from '../../lib/security/forms';
+
+const site = getSettings('site');
+if (!site.newsletterEnabled) return new Response(null, { status: 404 });
+
+let done = false;
+let error = '';
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  let ip = 'unknown';
+  try { ip = clientIp(Astro.request, Astro.clientAddress); } catch { /* ignore */ }
+  if (formString(fd, HONEYPOT_FIELD)) {
+    done = true;
+  } else if (!checkFormToken(formString(fd, 'form_token'))) {
+    error = 'Your form expired or was sent too quickly. Please try again.';
+  } else if (!rateLimit(`newsletter:${ipKey(ip)}`, 5, 3600).ok) {
+    error = 'Too many sign-up attempts. Please try again later.';
+    Astro.response.status = 429;
+  } else if (!(await verifyTurnstile(formString(fd, 'cf-turnstile-response'), ip))) {
+    error = 'We could not verify that you are human. Please try again.';
+  } else {
+    const parsed = newsletterSchema.safeParse({ email: formString(fd, 'email'), consent: formString(fd, 'consent') });
+    if (!parsed.success) {
+      error = Object.values(fieldErrors(parsed.error))[0];
+    } else {
+      const email = parsed.data.email;
+      const existing = findSubscriber(email);
+      // Same response whether or not the address is already subscribed (no account enumeration).
+      if (existing?.status !== 'confirmed' && rateLimit(`newsletter-mail:${email}`, 3, 86400).ok) {
+        const token = randomToken(32);
+        upsertPendingSubscriber(email, sha256(token), `Subscribed via ${absoluteUrl('/newsletter')} with consent checkbox on ${new Date().toISOString()}`);
+        await sendEmail({
+          to: email,
+          subject: `Please confirm your subscription to ${site.name}`,
+          text: `Hi!\n\nPlease confirm that you'd like to receive new crochet tutorials and patterns from ${site.name}:\n\n${absoluteUrl(`/newsletter/confirm?token=${token}`)}\n\nIf you didn't sign up, just ignore this email — you won't be subscribed.\n\nTo stop emails at any time: ${absoluteUrl(`/newsletter/unsubscribe?token=${token}`)}\n`,
+        });
+      }
+      done = true;
+    }
+  }
+  if (error && Astro.response.status === 200) Astro.response.status = 400;
+}
+---
+<BaseLayout meta={{ title: 'Newsletter', description: `Get new crochet tutorials and patterns from ${site.name} by email. Double opt-in, no spam, unsubscribe any time.`, path: '/newsletter', noindex: Astro.request.method === 'POST' }}>
+  <div class="wrap" style="padding-block:2rem 4rem;max-width:720px">
+    <header class="page-header">
+      <span class="eyebrow">Newsletter</span>
+      <h1>{done ? 'Almost done — check your inbox' : 'New tutorials, by email'}</h1>
+    </header>
+    {done ? (
+      <div class="notice notice--success" role="status">
+        <p>If that address isn't already subscribed, we've sent a confirmation link to it. Click the link to finish signing up. (No email? Check your spam folder.)</p>
+        <p style="margin:0"><a href="/blog">Back to the articles</a></p>
+      </div>
+    ) : (
+      <>
+        {error && <div class="notice notice--error" role="alert">{error}</div>}
+        <p class="lead">One friendly email when new guides and patterns are published. We never share your address, and every email has a one-click unsubscribe link.</p>
+        <div class="panel newsletter-panel"><NewsletterForm idPrefix="page-nl" /></div>
+      </>
+    )}
+  </div>
+</BaseLayout>

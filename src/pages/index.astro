@@ -1,0 +1,147 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ArticleCard from '../components/ArticleCard.astro';
+import CategoryTiles from '../components/CategoryTiles.astro';
+import SearchForm from '../components/SearchForm.astro';
+import NewsletterForm from '../components/NewsletterForm.astro';
+import { getSettings } from '../lib/settings';
+import { getFeaturedCard, listPublishedCards, getPublishedBySlug } from '../lib/repos/articles';
+import { listCategories } from '../lib/repos/categories';
+
+const site = getSettings('site');
+const featured = getFeaturedCard();
+const latest = listPublishedCards({ limit: 6, excludeIds: featured ? [featured.id] : [] }).items;
+const categories = listCategories()
+  .filter((c) => (c.publishedCount ?? 0) > 0)
+  .sort((a, b) => (b.publishedCount ?? 0) - (a.publishedCount ?? 0))
+  .slice(0, 8);
+
+const startHere = [
+  { slug: 'how-to-crochet-for-beginners', blurb: 'Make a slip knot, a chain and your first rows of single crochet.' },
+  { slug: 'crochet-supplies-for-beginners', blurb: 'The short list of tools you actually need — and what can wait.' },
+  { slug: 'basic-crochet-stitches', blurb: 'Chain to treble: how each basic stitch is made and how tall it is.' },
+]
+  .map((s) => ({ ...s, article: getPublishedBySlug(s.slug) }))
+  .filter((s) => s.article);
+---
+<BaseLayout meta={{ title: site.name, description: site.description, path: '/' }}>
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="eyebrow">Crochet for beginners &amp; hobbyists</span>
+        <h1>Learn to crochet, <em>one loop at a time</em></h1>
+        <p class="lead">{site.description}</p>
+        <SearchForm id="hero-q" />
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="/category/crochet-for-beginners">Start learning</a>
+          <a class="btn btn-secondary" href="/category/crochet-patterns">Browse patterns</a>
+        </div>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <svg viewBox="0 0 460 400" focusable="false">
+          <circle cx="250" cy="200" r="175" fill="#f3e4d4" />
+          <circle cx="232" cy="218" r="112" fill="#c4664b" />
+          <g fill="none" stroke="#7a3520" stroke-opacity=".35" stroke-width="7">
+            <ellipse cx="232" cy="218" rx="108" ry="40" transform="rotate(-32 232 218)" />
+            <ellipse cx="232" cy="218" rx="104" ry="52" transform="rotate(18 232 218)" />
+            <ellipse cx="232" cy="218" rx="100" ry="64" transform="rotate(64 232 218)" />
+          </g>
+          <ellipse cx="196" cy="176" rx="30" ry="14" fill="#fbf4ec" opacity=".35" transform="rotate(-30 196 176)" />
+          <path d="M318 290 C370 340 410 290 440 330" fill="none" stroke="#c4664b" stroke-width="8" stroke-linecap="round" />
+          <g transform="translate(70 352) rotate(-38)">
+            <rect x="0" y="-11" width="170" height="22" rx="11" fill="#e8b86f" />
+            <rect x="160" y="-6" width="160" height="12" rx="6" fill="#c9ccd1" />
+            <path d="M318 -6 q10 0 10 7 l0 2 q-4 -6 -12 -2 z" fill="#5a3a2e" opacity=".6" />
+          </g>
+          <g fill="none" stroke="#7d9474" stroke-width="6">
+            <ellipse cx="88" cy="96" rx="20" ry="12" /><ellipse cx="118" cy="82" rx="20" ry="12" transform="rotate(-20 118 82)" />
+            <ellipse cx="146" cy="62" rx="20" ry="12" transform="rotate(-35 146 62)" />
+          </g>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  {featured && (
+    <section class="section" aria-labelledby="featured-heading" style="padding-top:0">
+      <div class="wrap">
+        <h2 id="featured-heading" class="eyebrow" style="margin-bottom:1rem">Featured guide</h2>
+        <ArticleCard article={featured} variant="featured" headingLevel={3} eager />
+      </div>
+    </section>
+  )}
+
+  {startHere.length > 0 && (
+    <section class="section section--tint" aria-labelledby="start-heading">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">New to crochet?</span>
+            <h2 id="start-heading">Start here</h2>
+            <p>Three short guides that take you from a ball of yarn to your first finished swatch.</p>
+          </div>
+          <a class="link-arrow" href="/category/crochet-for-beginners">All beginner guides</a>
+        </div>
+        <ol class="steps">
+          {startHere.map((s) => (
+            <li>
+              <h3><a href={`/blog/${s.slug}`}>{s.article!.title}</a></h3>
+              <p>{s.blurb}</p>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  )}
+
+  <section class="section" aria-labelledby="latest-heading">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Fresh from the blog</span>
+          <h2 id="latest-heading">Latest articles</h2>
+        </div>
+        <a class="link-arrow" href="/blog">View all articles</a>
+      </div>
+      {latest.length ? (
+        <div class="card-grid card-grid--3">{latest.map((a) => <ArticleCard article={a} />)}</div>
+      ) : (
+        <p class="empty-state">New articles are on their way.</p>
+      )}
+    </div>
+  </section>
+
+  {categories.length > 0 && (
+    <section class="section section--tint" aria-labelledby="cats-heading">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">Find your next project</span>
+            <h2 id="cats-heading">Popular categories</h2>
+          </div>
+          <a class="link-arrow" href="/categories">All categories</a>
+        </div>
+        <CategoryTiles categories={categories} />
+      </div>
+    </section>
+  )}
+
+  <section class="section" aria-labelledby="about-heading">
+    <div class="wrap split">
+      <div>
+        <span class="eyebrow">About {site.name}</span>
+        <h2 id="about-heading">Clear, practical crochet help</h2>
+        <p class="lead">We write step-by-step guides for people who are learning to crochet or coming back to it after a break.</p>
+        <p>Every guide uses US terms with UK equivalents, gives hook sizes in millimetres, and explains the “why” behind each step so you can troubleshoot on your own. Patterns list stitch counts for every row or round.</p>
+        <a class="link-arrow" href="/about">Read our editorial standards</a>
+      </div>
+      {site.newsletterEnabled && (
+        <div class="panel newsletter-panel" id="newsletter">
+          <h2 style="font-size:1.5rem">Get new tutorials by email</h2>
+          <p>One friendly email when new guides and patterns go up. No spam, and you can unsubscribe in one click.</p>
+          <NewsletterForm idPrefix="home-nl" />
+        </div>
+      )}
+    </div>
+  </section>
+</BaseLayout>

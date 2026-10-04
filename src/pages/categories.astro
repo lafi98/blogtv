@@ -1,0 +1,33 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import CategoryTiles from '../components/CategoryTiles.astro';
+import { listCategories } from '../lib/repos/categories';
+import { breadcrumbLd } from '../lib/seo';
+
+const categories = listCategories();
+const withPosts = categories.filter((c) => (c.publishedCount ?? 0) > 0);
+const crumbs = [{ name: 'Home', path: '/' }, { name: 'Categories', path: '/categories' }];
+---
+<BaseLayout meta={{ title: 'Crochet categories', description: 'Browse crochet tutorials, patterns and tips by topic: beginners, stitches, bags, home decor, gifts, kids, seasonal projects and more.', path: '/categories' }} structuredData={[breadcrumbLd(crumbs)]}>
+  <div class="wrap" style="padding-bottom:4rem">
+    <Breadcrumbs items={crumbs} />
+    <header class="page-header">
+      <span class="eyebrow">Browse</span>
+      <h1>Categories</h1>
+      <p class="lead">Pick a topic to see every guide we've written about it.</p>
+    </header>
+    <CategoryTiles categories={withPosts} />
+    <section style="margin-top:3rem" aria-labelledby="cat-desc-heading">
+      <h2 id="cat-desc-heading" class="visually-hidden">What each category covers</h2>
+      <dl class="prose" style="max-width:none">
+        {withPosts.map((c) => (
+          <>
+            <dt><a href={`/category/${c.slug}`}><strong>{c.name}</strong></a></dt>
+            <dd style="margin:0 0 1rem">{c.description}</dd>
+          </>
+        ))}
+      </dl>
+    </section>
+  </div>
+</BaseLayout>

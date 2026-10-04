@@ -1,0 +1,56 @@
+---
+import Logo from './Logo.astro';
+import { getSettings } from '../lib/settings';
+import { listCategories } from '../lib/repos/categories';
+
+const site = getSettings('site');
+const cats = listCategories().filter((c) => (c.publishedCount ?? 0) > 0).slice(0, 6);
+const year = new Date().getUTCFullYear();
+const social = Object.entries(site.social).filter(([, url]) => /^https:\/\//.test(url));
+---
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <Logo name={site.name} />
+        <p class="footer-about">{site.description}</p>
+        {social.length > 0 && (
+          <ul aria-label="Follow us" style="display:flex;gap:1rem;margin-top:1rem">
+            {social.map(([name, url]) => <li><a href={url} rel="me noopener" target="_blank">{name[0].toUpperCase() + name.slice(1)}<span class="visually-hidden"> (opens in a new tab)</span></a></li>)}
+          </ul>
+        )}
+      </div>
+      <nav aria-labelledby="f-explore">
+        <h2 id="f-explore">Explore</h2>
+        <ul>
+          <li><a href="/blog">All articles</a></li>
+          {cats.map((c) => <li><a href={`/category/${c.slug}`}>{c.name}</a></li>)}
+        </ul>
+      </nav>
+      <nav aria-labelledby="f-site">
+        <h2 id="f-site">The site</h2>
+        <ul>
+          <li><a href="/about">About</a></li>
+          <li><a href="/contact">Contact</a></li>
+          {site.newsletterEnabled && <li><a href="/newsletter">Newsletter</a></li>}
+          <li><a href="/sitemap">Sitemap</a></li>
+          <li><a href="/rss.xml">RSS feed</a></li>
+        </ul>
+      </nav>
+      <nav aria-labelledby="f-legal">
+        <h2 id="f-legal">Legal</h2>
+        <ul>
+          <li><a href="/privacy-policy">Privacy Policy</a></li>
+          <li><a href="/cookie-policy">Cookie Policy</a></li>
+          <li><a href="/terms">Terms</a></li>
+          <li><a href="/disclaimer">Disclaimer</a></li>
+          <li><button type="button" class="linklike" data-consent="open">Cookie settings</button></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <p style="margin:0">© {year} {site.operatorName || site.name}. All rights reserved.</p>
+      <p style="margin:0">Written for makers, by makers. No sponsored content.</p>
+    </div>
+  </div>
+</footer>

@@ -1,0 +1,36 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import { listForSitemap } from '../lib/repos/articles';
+import { listCategories } from '../lib/repos/categories';
+
+const articles = listForSitemap();
+const categories = listCategories().filter((c) => (c.publishedCount ?? 0) > 0);
+const byCat = new Map<string, typeof articles>();
+for (const a of articles) {
+  const k = a.category_slug ?? '';
+  byCat.set(k, [...(byCat.get(k) ?? []), a]);
+}
+const crumbs = [{ name: 'Home', path: '/' }, { name: 'Sitemap', path: '/sitemap' }];
+---
+<BaseLayout meta={{ title: 'Sitemap', description: 'Every page and article on the site, grouped by category.', path: '/sitemap' }}>
+  <div class="wrap" style="padding-bottom:4rem">
+    <Breadcrumbs items={crumbs} />
+    <header class="page-header"><h1>Sitemap</h1></header>
+    <section aria-labelledby="sm-pages">
+      <h2 id="sm-pages">Pages</h2>
+      <ul class="sitemap-list">
+        <li><a href="/">Home</a></li><li><a href="/blog">All articles</a></li><li><a href="/categories">Categories</a></li>
+        <li><a href="/about">About</a></li><li><a href="/contact">Contact</a></li><li><a href="/newsletter">Newsletter</a></li>
+        <li><a href="/privacy-policy">Privacy Policy</a></li><li><a href="/cookie-policy">Cookie Policy</a></li>
+        <li><a href="/terms">Terms and Conditions</a></li><li><a href="/disclaimer">Disclaimer</a></li>
+      </ul>
+    </section>
+    {categories.map((c) => (
+      <section aria-labelledby={`sm-${c.slug}`} style="margin-top:2rem">
+        <h2 id={`sm-${c.slug}`}><a href={`/category/${c.slug}`}>{c.name}</a></h2>
+        <ul class="sitemap-list">{(byCat.get(c.slug) ?? []).map((a) => <li><a href={`/blog/${a.slug}`}>{a.title}</a></li>)}</ul>
+      </section>
+    ))}
+  </div>
+</BaseLayout>

@@ -1,0 +1,54 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ArticleCard from '../components/ArticleCard.astro';
+import SearchForm from '../components/SearchForm.astro';
+import CategoryTiles from '../components/CategoryTiles.astro';
+import { searchPublished } from '../lib/repos/articles';
+import { listCategories } from '../lib/repos/categories';
+import { clientIp, ipKey, rateLimit } from '../lib/security/rateLimit';
+
+const q = (Astro.url.searchParams.get('q') ?? '').trim().slice(0, 100);
+const pageRaw = Astro.url.searchParams.get('page') ?? '1';
+const page = /^[1-9]\d{0,3}$/.test(pageRaw) ? Number(pageRaw) : 1;
+const size = 12;
+let limited = false;
+let result = { items: [] as ReturnType<typeof searchPublished>['items'], total: 0 };
+if (q) {
+  let ip = 'unknown';
+  try { ip = clientIp(Astro.request, Astro.clientAddress); } catch { /* ignore */ }
+  limited = !rateLimit(`search:${ipKey(ip)}`, 60, 60).ok;
+  if (limited) Astro.response.status = 429;
+  else result = searchPublished(q, size, (page - 1) * size);
+}
+const totalPages = Math.ceil(result.total / size);
+const categories = listCategories().filter((c) => (c.publishedCount ?? 0) > 0);
+---
+<BaseLayout meta={{ title: q ? 'Search results' : 'Search', description: 'Search crochet tutorials, stitch guides, patterns and tips.', path: '/search', noindex: true }}>
+  <div class="wrap" style="padding-bottom:4rem">
+    <header class="page-header">
+      <span class="eyebrow">Search</span>
+      <h1>{q ? <>Results for “{q}”</> : 'Search the site'}</h1>
+      <SearchForm value={q} id="search-page-q" />
+    </header>
+    {limited && <div class="notice notice--error" role="alert">You're searching very quickly — please wait a minute and try again.</div>}
+    {q && !limited && (
+      <p role="status">{result.total === 0 ? 'No articles matched your search.' : `${result.total} ${result.total === 1 ? 'article' : 'articles'} found.`}</p>
+    )}
+    {result.items.length > 0 && <div class="card-grid card-grid--3">{result.items.map((a) => <ArticleCard article={a} headingLevel={2} />)}</div>}
+    {totalPages > 1 && (
+      <nav class="pagination" aria-label="Search results pages">
+        <ul>
+          {page > 1 && <li><a href={`/search?q=${encodeURIComponent(q)}&page=${page - 1}`} rel="prev">← Previous</a></li>}
+          <li><span aria-current="page">Page {page} of {totalPages}</span></li>
+          {page < totalPages && <li><a href={`/search?q=${encodeURIComponent(q)}&page=${page + 1}`} rel="next">Next →</a></li>}
+        </ul>
+      </nav>
+    )}
+    {(!q || result.total === 0) && (
+      <section style="margin-top:2.5rem" aria-labelledby="browse-heading">
+        <h2 id="browse-heading">Browse by category</h2>
+        <CategoryTiles categories={categories} />
+      </section>
+    )}
+  </div>
+</BaseLayout>

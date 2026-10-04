@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 320" width="820" height="320" role="img" aria-labelledby="t d">
+  <title id="t">Parts of a crochet hook</title>
+  <desc id="d">A crochet hook from left to right: the handle, the flattened thumb rest, the shaft whose width sets the hook size, the throat (the groove that catches the yarn) and the point.</desc>
+  <style>
+    .lbl{font:600 18px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#2d2420}
+    .small{font:400 14px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#675850}
+    .title{font:700 22px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#2d2420}
+    .lead{stroke:#675850;stroke-width:2}
+  </style>
+  <rect width="820" height="320" fill="#faf6f0"/>
+  <text x="410" y="38" text-anchor="middle" class="title">Parts of a crochet hook</text>
+  <!-- handle -->
+  <rect x="60" y="148" width="300" height="34" rx="17" fill="#e8b86f"/>
+  <!-- thumb rest -->
+  <rect x="330" y="140" width="110" height="50" rx="10" fill="#d19c34"/>
+  <!-- shaft -->
+  <rect x="430" y="155" width="290" height="20" rx="10" fill="#c9ccd1"/>
+  <rect x="430" y="155" width="290" height="6" rx="3" fill="#fff" opacity=".45"/>
+  <!-- head with throat -->
+  <path d="M715 155 L752 155 Q770 155 768 168 Q766 176 752 172 L736 166 Q726 168 722 175 L715 175 Z" fill="#b9bec5"/>
+  <path d="M736 166 Q730 162 722 165" fill="none" stroke="#5a3a2e" stroke-width="2.5"/>
+  <!-- leaders -->
+  <path class="lead" d="M200 182 L200 240"/><text x="200" y="262" text-anchor="middle" class="lbl">Handle</text>
+  <path class="lead" d="M385 140 L385 95"/><text x="385" y="82" text-anchor="middle" class="lbl">Thumb rest</text><text x="385" y="62" text-anchor="middle" class="small">size is often printed here</text>
+  <path class="lead" d="M575 175 L575 240"/><text x="575" y="262" text-anchor="middle" class="lbl">Shaft</text><text x="575" y="284" text-anchor="middle" class="small">its width sets the hook size (mm)</text>
+  <path class="lead" d="M728 166 L700 95"/><text x="690" y="82" text-anchor="middle" class="lbl">Throat</text><text x="690" y="62" text-anchor="middle" class="small">catches the yarn</text>
+  <path class="lead" d="M766 168 L790 240"/><text x="770" y="262" text-anchor="middle" class="lbl">Point</text>
+</svg>

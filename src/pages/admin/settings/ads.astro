@@ -1,0 +1,54 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { ADSENSE_CLIENT_RE, ADSENSE_SLOT_RE, AD_POSITIONS, getSettings, saveSettings } from '../../../lib/settings';
+import { setFlash } from '../../../lib/admin/flash';
+import { adRuntime } from '../../../lib/ads';
+import { config } from '../../../lib/config';
+import { audit } from '../../../lib/db';
+
+const s = getSettings('ads');
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const clientId = String(fd.get('clientId') ?? '').trim();
+  const slots = Object.fromEntries(AD_POSITIONS.map((p) => [p, String(fd.get(`slot-${p}`) ?? '').trim()])) as typeof s.slots;
+  const errors: string[] = [];
+  if (clientId && !ADSENSE_CLIENT_RE.test(clientId)) errors.push('Publisher ID must look like ca-pub-1234567890123456 (copy it from your AdSense account).');
+  for (const [p, v] of Object.entries(slots)) if (v && !ADSENSE_SLOT_RE.test(v)) errors.push(`Ad unit ID for "${p}" must be digits only.`);
+  const enabled = fd.get('enabled') === 'on';
+  if (enabled && !ADSENSE_CLIENT_RE.test(clientId)) errors.push('Ads can only be enabled with a valid publisher ID.');
+  if (errors.length) setFlash(Astro.cookies, 'error', errors.join(' '));
+  else {
+    saveSettings('ads', { enabled, clientId, slots, showPlaceholders: fd.get('showPlaceholders') === 'on', minWordsForInContent: Math.max(300, Number(fd.get('minWordsForInContent')) || 700) });
+    audit('settings.ads', { userId: Astro.locals.user!.id, details: `enabled=${enabled}` });
+    setFlash(Astro.cookies, 'success', 'Advertising settings saved.');
+  }
+  return Astro.redirect('/admin/settings/ads', 303);
+}
+const rt = adRuntime();
+const csrf = Astro.locals.csrfToken;
+const labels: Record<string, string> = { top: 'Top — below the article header image', 'in-content': 'In content — after the 2nd section of long articles', sidebar: 'Sidebar — desktop only, below the table of contents', bottom: 'Bottom — after the article, before related posts' };
+---
+<AdminLayout title="Advertising">
+  <h1>Advertising (Google AdSense)</h1>
+  <div class="card">
+    <p>Status: <strong>{rt.live ? 'LIVE' : 'OFF'}</strong>{!rt.live && <span class="muted"> — {rt.reason}</span>}{config.ads.killSwitch && <strong> ADS_DISABLED=true overrides this page.</strong>}</p>
+    <ul class="muted" style="font-size:.92rem">
+      <li>Ads appear only on articles and article listings — never on legal pages, contact, search, error or admin pages, and never in previews.</li>
+      <li>At most four labelled units per article; the in-content unit only on articles of {s.minWordsForInContent}+ words.</li>
+      <li>The AdSense script loads only after the visitor's consent state allows it (see Cookies &amp; consent).</li>
+      <li>When a publisher ID is entered, <code>/ads.txt</code> is served automatically and the policies mention advertising.</li>
+    </ul>
+  </div>
+  <form method="post" class="card">
+    <input type="hidden" name="_csrf" value={csrf} />
+    <div class="field"><label for="clientId">AdSense publisher ID</label><input id="clientId" name="clientId" type="text" value={s.clientId} placeholder="ca-pub-…" pattern="ca-pub-\d{10,20}" /><p class="hint">Leave empty until Google gives you one. Never use someone else's ID.</p></div>
+    <h2>Ad unit IDs (from AdSense → Ads → By ad unit)</h2>
+    {AD_POSITIONS.map((p) => (
+      <div class="field"><label for={`slot-${p}`}>{labels[p]}</label><input id={`slot-${p}`} name={`slot-${p}`} type="text" inputmode="numeric" value={s.slots[p]} /></div>
+    ))}
+    <div class="field" style="max-width:260px"><label for="minWordsForInContent">Min. words for in-content ad</label><input id="minWordsForInContent" name="minWordsForInContent" type="number" min="300" value={s.minWordsForInContent} /></div>
+    <label class="check"><input type="checkbox" name="showPlaceholders" checked={s.showPlaceholders} /> Show labelled placeholders where ads would appear (development only — never shown in production)</label>
+    <label class="check" style="margin-top:.6rem"><input type="checkbox" name="enabled" checked={s.enabled} /> <strong>Enable ads</strong></label>
+    <p style="margin-top:1rem"><button class="btn btn-primary" type="submit">Save</button></p>
+  </form>
+</AdminLayout>

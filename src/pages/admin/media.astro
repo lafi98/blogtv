@@ -1,0 +1,91 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { deleteImageRecord, getImage, imageUsage, listImages, updateImageMeta } from '../../lib/repos/images';
+import { deleteImageFiles, MAX_UPLOAD_BYTES, storeImage } from '../../lib/images/process';
+import { setFlash } from '../../lib/admin/flash';
+import { audit } from '../../lib/db';
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const str = (k: string, max: number) => String(fd.get(k) ?? '').trim().slice(0, max);
+  const intent = String(fd.get('intent') ?? '');
+  const id = Number(fd.get('id')) || 0;
+  const meta = { alt: str('alt', 300), caption: str('caption', 300), credit: str('credit', 200), license: str('license', 300), sourceUrl: str('sourceUrl', 500) };
+  try {
+    if (intent === 'upload') {
+      const file = fd.get('file');
+      if (!(file instanceof File) || file.size === 0) throw new Error('Choose an image file.');
+      if (file.size > MAX_UPLOAD_BYTES) throw new Error('Image is larger than 10 MB.');
+      if (meta.alt.length < 10) throw new Error('Describe the image in the alt text (at least 10 characters).');
+      if (!meta.license) throw new Error('Record the licence or rights for this image (e.g. "Own photo", "CC BY 4.0 — Jane Doe").');
+      if (meta.sourceUrl && !/^https?:\/\/\S+$/.test(meta.sourceUrl)) throw new Error('Source URL must be a full URL.');
+      const newId = await storeImage(Buffer.from(await file.arrayBuffer()), { ...meta, originalName: file.name });
+      audit('image.uploaded', { userId: Astro.locals.user!.id, entity: 'image', entityId: newId });
+      setFlash(Astro.cookies, 'success', 'Image uploaded and optimised.');
+    } else if (intent === 'update' && getImage(id)) {
+      if (meta.alt.length < 10 || !meta.license) throw new Error('Alt text (10+ characters) and licence are required.');
+      updateImageMeta(id, meta);
+      setFlash(Astro.cookies, 'success', 'Image details saved.');
+    } else if (intent === 'delete' && getImage(id)) {
+      const img = getImage(id)!;
+      const used = imageUsage(id);
+      if (used > 0) throw new Error(`This image is used in ${used} place(s). Remove it from those articles/authors first.`);
+      deleteImageRecord(id);
+      deleteImageFiles([...img.variants.map((v) => v.file), ...(img.ogFile ? [img.ogFile] : [])]);
+      audit('image.deleted', { userId: Astro.locals.user!.id, entity: 'image', entityId: id });
+      setFlash(Astro.cookies, 'success', 'Image deleted.');
+    }
+  } catch (err) {
+    setFlash(Astro.cookies, 'error', (err as Error).message);
+  }
+  return Astro.redirect('/admin/media', 303);
+}
+const images = listImages(300);
+const csrf = Astro.locals.csrfToken;
+---
+<AdminLayout title="Media library">
+  <h1>Media library</h1>
+  <section class="card" aria-labelledby="up-h">
+    <h2 id="up-h" style="margin-top:0">Upload an image</h2>
+    <p class="muted">Only upload images you own or have permission to use. JPEG, PNG, WebP, AVIF or GIF up to 10 MB. Images are resized to responsive WebP versions, a 1200×630 social image is created, and metadata such as GPS location is removed.</p>
+    <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf" value={csrf} />
+      <input type="hidden" name="intent" value="upload" />
+      <div class="grid grid-2">
+        <div class="field"><label for="file">Image file</label><input id="file" name="file" type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/gif" required /></div>
+        <div class="field"><label for="alt">Alt text (describe what the image shows)</label><input id="alt" name="alt" type="text" required minlength="10" maxlength="300" /></div>
+        <div class="field"><label for="license">Licence / rights</label><input id="license" name="license" type="text" required placeholder="Own photo · CC BY 4.0 — Name · Licensed from …" /></div>
+        <div class="field"><label for="credit">Credit (shown if required)</label><input id="credit" name="credit" type="text" /></div>
+        <div class="field"><label for="sourceUrl">Source URL (if not your own)</label><input id="sourceUrl" name="sourceUrl" type="url" /></div>
+        <div class="field"><label for="caption">Caption (optional)</label><input id="caption" name="caption" type="text" /></div>
+      </div>
+      <button class="btn btn-primary" type="submit">Upload</button>
+    </form>
+  </section>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Preview</th><th>Details</th><th>Use in Markdown</th></tr></thead>
+      <tbody>
+        {images.map((i) => (
+          <tr>
+            <td><img class="thumb" src={`/media/${i.variants[0]?.file}`} alt="" loading="lazy" width="96" height="54" /></td>
+            <td>
+              <form method="post">
+                <input type="hidden" name="_csrf" value={csrf} />
+                <input type="hidden" name="id" value={i.id} />
+                <label for={`alt-${i.id}`}>Alt text</label><input id={`alt-${i.id}`} name="alt" type="text" value={i.alt} />
+                <label for={`lic-${i.id}`}>Licence</label><input id={`lic-${i.id}`} name="license" type="text" value={i.license} />
+                <input type="hidden" name="credit" value={i.credit} /><input type="hidden" name="caption" value={i.caption} /><input type="hidden" name="sourceUrl" value={i.sourceUrl} />
+                <div class="toolbar" style="margin-top:.4rem">
+                  <button class="btn btn-small" name="intent" value="update" type="submit">Save</button>
+                  <button class="btn btn-small btn-danger" name="intent" value="delete" type="submit" data-confirm="Delete this image and its files?">Delete</button>
+                </div>
+              </form>
+            </td>
+            <td><code style="font-size:.8rem;word-break:break-all">![{i.alt}](/media/{i.variants[i.variants.length - 1]?.file})</code><br /><small class="muted">{i.width}×{i.height}</small></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</AdminLayout>

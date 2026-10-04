@@ -1,0 +1,31 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { listRuns } from '../../../lib/repos/aiRuns';
+const runs = listRuns(200);
+---
+<AdminLayout title="AI run log">
+  <h1>AI run log</h1>
+  <p class="muted">Every AI run: keyword, timing, Claude result, validation, publication result and errors.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Run</th><th>Keyword</th><th>Status</th><th>Mode / trigger</th><th>Started (UTC)</th><th>Completed</th><th>Claude</th><th>Validation</th><th>Publication</th><th>Article</th></tr></thead>
+      <tbody>
+        {runs.map((r) => (
+          <tr>
+            <td><a href={`/admin/runs/${r.id}`}>#{r.id}</a></td>
+            <td>{r.keyword}</td>
+            <td>{r.status}</td>
+            <td>{r.mode} / {r.trigger}</td>
+            <td>{r.startedAt.slice(0, 16).replace('T', ' ')}</td>
+            <td>{r.completedAt ? r.completedAt.slice(11, 16) : '—'}</td>
+            <td>{r.claudeStatus}</td>
+            <td>{r.validationStatus ? `${r.validationStatus} (${r.validationErrors}E/${r.validationWarnings}W)` : '—'}</td>
+            <td><small>{r.publicationResult}{r.error && <span class="muted"> — {r.error.slice(0, 100)}</span>}</small></td>
+            <td>{r.articleId ? <a href={`/admin/articles/${r.articleId}`}>#{r.articleId}</a> : '—'}</td>
+          </tr>
+        ))}
+        {runs.length === 0 && <tr><td colspan="10" class="muted">No runs yet.</td></tr>}
+      </tbody>
+    </table>
+  </div>
+</AdminLayout>

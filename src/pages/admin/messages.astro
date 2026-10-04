@@ -1,0 +1,33 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { deleteMessage, listMessages, setMessageStatus } from '../../lib/repos/messages';
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const id = Number(fd.get('id')) || 0;
+  const intent = String(fd.get('intent'));
+  if (id && intent === 'read') setMessageStatus(id, 'read');
+  if (id && intent === 'archive') setMessageStatus(id, 'archived');
+  if (id && intent === 'delete') deleteMessage(id);
+  return Astro.redirect('/admin/messages', 303);
+}
+const messages = listMessages();
+const csrf = Astro.locals.csrfToken;
+---
+<AdminLayout title="Messages">
+  <h1>Contact messages</h1>
+  {messages.length === 0 && <p class="muted">No messages.</p>}
+  {messages.map((m) => (
+    <article class="card">
+      <p><strong>{m.subject || '(no subject)'}</strong> {m.status === 'new' && <span class="pill pill-review">new</span>}<br />
+        <span class="muted">{m.name} &lt;<a href={`mailto:${m.email}`}>{m.email}</a>&gt; · {m.createdAt.slice(0, 16).replace('T', ' ')} UTC</span></p>
+      <p style="white-space:pre-wrap">{m.body}</p>
+      <form method="post" class="toolbar">
+        <input type="hidden" name="_csrf" value={csrf} /><input type="hidden" name="id" value={m.id} />
+        {m.status === 'new' && <button class="btn btn-small" name="intent" value="read">Mark read</button>}
+        <button class="btn btn-small" name="intent" value="archive">Archive</button>
+        <button class="btn btn-small btn-danger" name="intent" value="delete" data-confirm="Delete this message permanently?">Delete</button>
+      </form>
+    </article>
+  ))}
+</AdminLayout>

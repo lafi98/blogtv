@@ -1,0 +1,61 @@
+---
+/**
+ * Cookie banner + preferences dialog. Rendered hidden; public/js consent controller
+ * decides whether to show it. If the site uses no optional cookies, no banner appears
+ * and "Cookie settings" simply explains that only essential cookies are used.
+ */
+import { consentConfig } from '../lib/consent';
+import { DEFAULTS, getSettings } from '../lib/settings';
+
+const cfg = consentConfig();
+const c = getSettings('consent');
+const optional = cfg.categories.filter((x) => !x.required);
+const configJson = JSON.stringify(cfg).replace(/</g, '\\u003c');
+// The default text names only the optional cookie types this site actually uses.
+const kinds = optional.map((x) => x.label.toLowerCase());
+const bannerText =
+  c.bannerText === DEFAULTS.consent.bannerText && kinds.length
+    ? `We use essential cookies to run this site. With your permission we would also like to use ${kinds.join(' and ')} cookies. You can change your choice at any time.`
+    : c.bannerText;
+---
+<script type="application/json" id="consent-config" set:html={configJson}></script>
+
+<section id="consent-banner" class="consent-banner" aria-labelledby="consent-title" hidden>
+  <h2 id="consent-title">Your privacy choices</h2>
+  <p>{bannerText} <a href="/cookie-policy">Cookie Policy</a></p>
+  <div class="consent-actions">
+    {cfg.mode === 'notice' ? (
+      <button type="button" class="btn btn-primary btn-small" data-consent="ok">OK</button>
+    ) : (
+      <>
+        <button type="button" class="btn btn-primary btn-small" data-consent="accept">Accept all</button>
+        <button type="button" class="btn btn-primary btn-small" data-consent="reject">Reject all</button>
+      </>
+    )}
+    <button type="button" class="btn btn-secondary btn-small" data-consent="manage">Manage choices</button>
+  </div>
+</section>
+
+<dialog id="consent-dialog" class="consent-dialog" aria-labelledby="consent-dialog-title">
+  <form method="dialog">
+    <h2 id="consent-dialog-title">Cookie settings</h2>
+    {optional.length === 0 ? (
+      <p>This site currently uses only strictly necessary cookies, so there is nothing to switch on or off. See the <a href="/cookie-policy">Cookie Policy</a> for details.</p>
+    ) : (
+      <p>Choose which optional cookies we may use. You can change this at any time from the “Cookie settings” link in the footer.</p>
+    )}
+    {cfg.categories.map((cat) => (
+      <div class="consent-cat">
+        <label class="check">
+          <input type="checkbox" name={cat.key} checked={cat.required} disabled={cat.required} />
+          <span>{cat.label}{cat.required && ' (always on)'}</span>
+        </label>
+        <p>{cat.description}</p>
+      </div>
+    ))}
+    <div class="consent-actions" style="margin-top:1rem">
+      {optional.length > 0 && <button type="submit" class="btn btn-primary btn-small" data-consent="save">Save choices</button>}
+      <button type="submit" class="btn btn-secondary btn-small" data-consent="close">Close</button>
+    </div>
+  </form>
+</dialog>

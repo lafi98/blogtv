@@ -1,0 +1,27 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import ArticleEditor from '../../../components/admin/ArticleEditor.astro';
+import { handleArticlePost } from '../../../lib/admin/articleActions';
+import { listAuthors } from '../../../lib/repos/authors';
+import type { ArticleInput } from '../../../lib/repos/articles';
+import type { ValidationReport } from '../../../lib/publishing/validator';
+
+let values: ArticleInput = {
+  slug: '', title: '', excerpt: '', contentMd: '', categoryId: null, authorId: listAuthors()[0]?.id ?? null, featuredImageId: null,
+  status: 'draft', featured: false, publishedAt: null, contentUpdatedAt: null, scheduledFor: null, seoTitle: '', metaDescription: '',
+  canonicalUrl: '', noindex: false, tags: [], faq: [], related: [], sources: [], aiAssisted: false, reviewedBy: '',
+};
+let errors: string[] = [];
+let report: ValidationReport | null = null;
+if (Astro.request.method === 'POST') {
+  const res = await handleArticlePost(await Astro.request.formData(), null, Astro.locals.user!, Astro.cookies);
+  if (res.redirect) return Astro.redirect(res.redirect, 303);
+  errors = res.errors ?? [];
+  report = res.report ?? null;
+  if (res.values) values = res.values;
+}
+---
+<AdminLayout title="New article">
+  <h1>New article</h1>
+  <ArticleEditor article={null} values={values} errors={errors} report={report} />
+</AdminLayout>

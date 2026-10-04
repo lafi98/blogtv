@@ -1,0 +1,27 @@
+---
+import Listing from '../../../components/Listing.astro';
+import { listPublishedCards } from '../../../lib/repos/articles';
+import { listCategories } from '../../../lib/repos/categories';
+import { parsePage, perPage } from '../../../lib/listing';
+
+const page = parsePage(Astro.params.page);
+if (page === null) return new Response(null, { status: 404 });
+const size = perPage();
+const { items, total } = listPublishedCards({ limit: size, offset: (page - 1) * size });
+const totalPages = Math.max(1, Math.ceil(total / size));
+if (page > totalPages) return new Response(null, { status: 404 });
+---
+<Listing
+  title="All crochet articles"
+  heading="All articles"
+  eyebrow="The blog"
+  description={`Crochet tutorials, stitch guides, patterns and tips — page ${page}.`}
+  lead="Tutorials, stitch guides, beginner-friendly patterns and practical tips — newest first."
+  path={`/blog/page/${page}`}
+  base="/blog"
+  crumbs={[{ name: 'Home', path: '/' }, { name: 'Blog', path: '/blog' }, { name: `Page ${page}`, path: `/blog/page/${page}` }]}
+  items={items}
+  page={page}
+  totalPages={totalPages}
+  categories={listCategories()}
+/>

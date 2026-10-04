@@ -1,0 +1,150 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import DailyPublisherPanel from '../../components/admin/DailyPublisherPanel.astro';
+import { listCategories } from '../../lib/repos/categories';
+import { deleteKeyword, getKeyword, listKeywords, moveKeywordToTop, updateKeyword } from '../../lib/repos/keywords';
+import { listRuns } from '../../lib/repos/aiRuns';
+import { getSettings, saveSettings } from '../../lib/settings';
+import { setFlash } from '../../lib/admin/flash';
+import { addKeywordToQueue, startManualRun } from '../../lib/publishing/publisher';
+import { audit } from '../../lib/db';
+
+const user = Astro.locals.user!;
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const intent = String(fd.get('intent') ?? '');
+  const id = Number(fd.get('id')) || 0;
+
+  if (intent === 'generate_draft' || intent === 'generate_publish') {
+    const r = startManualRun({ keyword: String(fd.get('keyword') ?? ''), mode: intent === 'generate_publish' ? 'publish' : 'draft', userId: user.id });
+    if (r.kind === 'started') {
+      r.done.catch((err) => console.error('[ai] run crashed:', err));
+      return Astro.redirect(`/admin/runs/${r.runId}`, 303);
+    }
+    if (r.kind === 'duplicate') return Astro.redirect(`/admin/runs/${r.runId}`, 303);
+    setFlash(Astro.cookies, 'error', r.message);
+    return Astro.redirect('/admin/topics#manual', 303);
+  }
+
+  if (intent === 'add') {
+    const lines = String(fd.get('keywords') ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 200);
+    const category = String(fd.get('categorySlug') ?? '');
+    const results = lines.map((l) => addKeywordToQueue(l, { categorySlug: category }));
+    const added = results.filter((r) => r.added).length;
+    const skipped = results.filter((r) => !r.added);
+    const msg = `Added ${added} keyword(s).` + (skipped.length ? ` Skipped ${skipped.length}: ` + skipped.map((s) => `“${s.keyword}” — ${(s.reason ?? '').split(/(?<=\.)\s/)[0]}`).join(' ') : '');
+    setFlash(Astro.cookies, skipped.length && !added ? 'error' : 'success', msg.slice(0, 1500));
+    return Astro.redirect('/admin/topics#queue', 303);
+  }
+
+  if (intent === 'pause' || intent === 'resume') {
+    saveSettings('automation', { ...getSettings('automation'), dailyEnabled: intent === 'resume' });
+    audit(`ai.daily_${intent}`, { userId: user.id });
+    setFlash(Astro.cookies, 'success', intent === 'resume' ? 'Daily publishing resumed.' : 'Daily publishing paused — the cron will do nothing until you resume.');
+    const back = String(fd.get('back') ?? '');
+    return Astro.redirect(/^\/admin(\/[a-z0-9/-]*)?$/.test(back) ? back : '/admin/topics', 303);
+  }
+
+  const k = getKeyword(id);
+  if (k && intent === 'top' && k.status === 'queued') moveKeywordToTop(k.id);
+  if (k && intent === 'retry' && (k.status === 'failed' || k.status === 'skipped_duplicate')) updateKeyword(k.id, { status: 'queued', attempts: 0, lastError: '' });
+  if (k && intent === 'delete' && k.status !== 'generating') deleteKeyword(k.id);
+  return Astro.redirect('/admin/topics#queue', 303);
+}
+
+const keywords = listKeywords();
+const runs = listRuns(20);
+const categories = listCategories();
+const csrf = Astro.locals.csrfToken;
+const statusPill: Record<string, string> = {
+  queued: 'pill-scheduled', generating: 'pill-review', published: 'pill-published', scheduled: 'pill-scheduled',
+  draft: 'pill-draft', failed: 'pill-fail', skipped_duplicate: 'pill-warn',
+  QUEUED: 'pill-scheduled', GENERATING: 'pill-review', VALIDATING: 'pill-review', PUBLISHED: 'pill-published',
+  SCHEDULED: 'pill-scheduled', DRAFT: 'pill-draft', FAILED: 'pill-fail', SKIPPED_DUPLICATE: 'pill-warn',
+};
+---
+<AdminLayout title="AI Publisher">
+  <h1>AI Publisher</h1>
+  <DailyPublisherPanel />
+
+  <section class="card" id="manual" aria-labelledby="manual-h">
+    <h2 id="manual-h" style="margin-top:0">Create an article from one keyword</h2>
+    <p class="muted">Claude analyses the keyword, checks it isn't already covered, researches it, writes the article, picks internal links from your published articles and an original cover illustration, then the validator checks it. <strong>Generate Draft</strong> always saves a draft. <strong>Generate &amp; Publish</strong> publishes only if validation passes (or schedules it for the next free day if today's AI publication already happened).</p>
+    <form method="post">
+      <input type="hidden" name="_csrf" value={csrf} />
+      <div class="field">
+        <label for="kw">Keyword</label>
+        <input id="kw" name="keyword" type="text" required minlength="3" maxlength="120" placeholder="easy crochet flower for beginners" />
+      </div>
+      <div class="toolbar">
+        <button class="btn" type="submit" name="intent" value="generate_draft">Generate Draft</button>
+        <button class="btn btn-primary" type="submit" name="intent" value="generate_publish">Generate &amp; Publish</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card" id="add" aria-labelledby="add-h">
+    <h2 id="add-h" style="margin-top:0">Add keywords to the daily queue</h2>
+    <p class="muted">One keyword per line (up to 200 at a time). Each is checked against existing articles and the queue; duplicates are not added. With Daily Publishing ON, one keyword is turned into one validated article per day, in this order.</p>
+    <form method="post">
+      <input type="hidden" name="_csrf" value={csrf} />
+      <input type="hidden" name="intent" value="add" />
+      <div class="field">
+        <label for="keywords">Keywords</label>
+        <textarea id="keywords" name="keywords" rows="6" placeholder={'easy crochet flower for beginners\ncrochet baby blanket ideas\ncrochet market tote bag pattern'}></textarea>
+      </div>
+      <div class="field" style="max-width:320px">
+        <label for="cat">Preferred category (optional)</label>
+        <select id="cat" name="categorySlug"><option value="">Let Claude choose</option>{categories.map((c) => <option value={c.slug}>{c.name}</option>)}</select>
+      </div>
+      <button class="btn btn-primary" type="submit">Add Keyword(s)</button>
+    </form>
+  </section>
+
+  <h2 id="queue">Keyword queue</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Keyword</th><th>Status</th><th>Article</th><th>Note</th><th></th></tr></thead>
+      <tbody>
+        {keywords.map((k, i) => (
+          <tr>
+            <td>{k.status === 'queued' ? i + 1 : ''}</td>
+            <td><strong>{k.keyword}</strong>{k.source === 'manual' && <small class="muted"> · manual</small>}{k.categorySlug && <small class="muted"> · {k.categorySlug}</small>}</td>
+            <td><span class={`pill ${statusPill[k.status]}`}>{k.status.replace('_', ' ')}</span>{k.attempts > 0 && <small class="muted"> · {k.attempts} attempt(s)</small>}</td>
+            <td>{k.articleId ? <a href={`/admin/articles/${k.articleId}`}>open</a> : '—'}</td>
+            <td><small class="muted">{k.lastError.slice(0, 200)}</small>{k.lastRunId && <> <a href={`/admin/runs/${k.lastRunId}`}><small>run #{k.lastRunId}</small></a></>}</td>
+            <td>
+              <form method="post" class="toolbar">
+                <input type="hidden" name="_csrf" value={csrf} /><input type="hidden" name="id" value={k.id} />
+                {k.status === 'queued' && <button class="btn btn-small" name="intent" value="top">Move to top</button>}
+                {(k.status === 'failed' || k.status === 'skipped_duplicate') && <button class="btn btn-small" name="intent" value="retry">Re-queue</button>}
+                {k.status !== 'generating' && <button class="btn btn-small btn-danger" name="intent" value="delete" data-confirm="Remove this keyword?">Remove</button>}
+              </form>
+            </td>
+          </tr>
+        ))}
+        {keywords.length === 0 && <tr><td colspan="6" class="muted">No keywords yet. Add some above.</td></tr>}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Recent AI runs <small class="muted"><a href="/admin/runs">full audit log</a></small></h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Run</th><th>Keyword</th><th>Status</th><th>Trigger</th><th>Started</th><th>Result</th></tr></thead>
+      <tbody>
+        {runs.map((r) => (
+          <tr>
+            <td><a href={`/admin/runs/${r.id}`}>#{r.id}</a></td>
+            <td>{r.keyword}</td>
+            <td><span class={`pill ${statusPill[r.status]}`}>{r.status}</span></td>
+            <td>{r.trigger}</td>
+            <td>{r.startedAt.slice(0, 16).replace('T', ' ')}</td>
+            <td><small>{r.publicationResult}{r.error && <span class="muted"> — {r.error.slice(0, 120)}</span>}</small></td>
+          </tr>
+        ))}
+        {runs.length === 0 && <tr><td colspan="6" class="muted">No runs yet.</td></tr>}
+      </tbody>
+    </table>
+  </div>
+</AdminLayout>

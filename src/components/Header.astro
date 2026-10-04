@@ -1,0 +1,31 @@
+---
+import Logo from './Logo.astro';
+import Icon from './Icon.astro';
+import { getSettings } from '../lib/settings';
+
+const site = getSettings('site');
+const path = Astro.url.pathname;
+const links = [
+  { href: '/blog', label: 'All articles' },
+  { href: '/category/crochet-for-beginners', label: 'Beginners' },
+  { href: '/category/crochet-patterns', label: 'Patterns' },
+  { href: '/category/crochet-stitches', label: 'Stitches' },
+  { href: '/categories', label: 'Categories' },
+  { href: '/about', label: 'About' },
+];
+const current = (href: string) => (path === href || (href !== '/' && path.startsWith(href + '/')) ? 'page' : undefined);
+---
+<header class="site-header">
+  <div class="wrap header-inner">
+    <Logo name={site.name} />
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <Icon name="menu" /> Menu
+    </button>
+    <nav id="primary-nav" class="primary-nav" aria-label="Main">
+      <ul>
+        {links.map((l) => <li><a href={l.href} aria-current={current(l.href)}>{l.label}</a></li>)}
+        <li class="nav-search"><a href="/search" aria-current={current('/search')}><Icon name="search" size={18} /> Search</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>

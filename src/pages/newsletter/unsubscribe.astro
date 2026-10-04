@@ -1,0 +1,26 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { unsubscribe } from '../../lib/repos/subscribers';
+import { sha256 } from '../../lib/security/crypto';
+
+const token = Astro.url.searchParams.get('token') ?? '';
+const valid = /^[A-Za-z0-9_-]{30,60}$/.test(token);
+let result: 'pending' | 'done' | 'invalid' = valid ? 'pending' : 'invalid';
+if (Astro.request.method === 'POST' && valid) {
+  unsubscribe(sha256(token));
+  result = 'done'; // same answer whether or not it changed anything
+}
+---
+<BaseLayout meta={{ title: 'Unsubscribe', description: 'Unsubscribe from the newsletter.', path: '/newsletter/unsubscribe', noindex: true }}>
+  <div class="wrap" style="padding-block:3rem 4rem;max-width:680px">
+    <h1>Unsubscribe</h1>
+    {result === 'pending' && (
+      <form method="post" action={`/newsletter/unsubscribe?token=${encodeURIComponent(token)}`}>
+        <p>Stop receiving our newsletter?</p>
+        <button class="btn btn-primary" type="submit">Unsubscribe</button>
+      </form>
+    )}
+    {result === 'done' && <div class="notice notice--success" role="status">You've been unsubscribed. Sorry to see you go!</div>}
+    {result === 'invalid' && <div class="notice notice--error" role="alert">This unsubscribe link is invalid. If you keep receiving emails, please <a href="/contact">contact us</a>.</div>}
+  </div>
+</BaseLayout>

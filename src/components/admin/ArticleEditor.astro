@@ -1,0 +1,202 @@
+---
+import ValidationReport from './ValidationReport.astro';
+import type { Article, ArticleInput } from '../../lib/repos/articles';
+import type { ValidationReport as Report } from '../../lib/publishing/validator';
+import { listCategories } from '../../lib/repos/categories';
+import { listAuthors } from '../../lib/repos/authors';
+import { listImages } from '../../lib/repos/images';
+import { corpusForValidation } from '../../lib/repos/articles';
+import { absoluteUrl } from '../../lib/config';
+
+interface Props {
+  article: Article | null;
+  values: ArticleInput;
+  errors: string[];
+  report: Report | null;
+}
+const { article, values: v, errors, report } = Astro.props;
+const categories = listCategories();
+const authors = listAuthors();
+const images = listImages(300);
+const slugs = corpusForValidation().filter((d) => d.id !== article?.id).map((d) => d.slug);
+const csrf = Astro.locals.csrfToken;
+const faqRows = [...v.faq, ...Array.from({ length: Math.max(0, 3 - v.faq.length) }, () => ({ q: '', a: '' }))];
+const currentImage = images.find((i) => i.id === v.featuredImageId);
+const toLocal = (iso: string | null) => (iso ? iso.slice(0, 16) : '');
+const status = article?.status ?? 'draft';
+---
+{errors.length > 0 && (
+  <div class="flash flash-error" role="alert"><ul style="margin:0;padding-left:1.2rem">{errors.map((e) => <li>{e}</li>)}</ul></div>
+)}
+<form method="post" class="grid editor">
+  <input type="hidden" name="_csrf" value={csrf} />
+  <div>
+    <div class="card">
+      <div class="field">
+        <label for="title">Title</label>
+        <input id="title" name="title" type="text" required maxlength="200" value={v.title} data-count="80" />
+      </div>
+      <div class="field">
+        <label for="slug">URL slug</label>
+        <input id="slug" name="slug" type="text" maxlength="100" pattern="[a-z0-9]+(-[a-z0-9]+)*" value={v.slug} aria-describedby="slug-hint" />
+        <p class="hint" id="slug-hint">Article URL: /blog/<strong>{v.slug || 'your-slug'}</strong>. Changing the slug of a published article breaks existing links.</p>
+      </div>
+      <div class="field">
+        <label for="excerpt">Excerpt / introduction summary</label>
+        <textarea id="excerpt" name="excerpt" maxlength="500" data-count="220">{v.excerpt}</textarea>
+        <p class="hint">Shown under the title and on article cards. Plain text, 1–2 sentences.</p>
+      </div>
+      <div class="field">
+        <label for="contentMd">Content (Markdown)</label>
+        <textarea id="contentMd" name="contentMd" class="md" aria-describedby="md-hint">{v.contentMd}</textarea>
+        <p class="hint" id="md-hint">
+          Use <code>## Heading</code> for sections (no H1), <code>1.</code> for steps, <code>-</code> for lists, <code>| a | b |</code> tables,
+          <code>[text](/blog/slug)</code> links and <code>![alt text](/media/file.webp)</code> images. Raw HTML is disabled for security.
+        </p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">FAQ <small class="muted">(optional — only genuinely useful questions)</small></h2>
+      <div id="faq-list">
+        {faqRows.map((f, i) => (
+          <div class="faq-row">
+            <label for={`faq_q_${i + 1}`}>Question {i + 1}</label>
+            <input type="text" id={`faq_q_${i + 1}`} name="faq_q" maxlength="300" value={f.q} />
+            <label for={`faq_a_${i + 1}`} style="margin-top:.4rem">Answer {i + 1}</label>
+            <textarea id={`faq_a_${i + 1}`} name="faq_a" maxlength="2000">{f.a}</textarea>
+          </div>
+        ))}
+      </div>
+      <button type="button" class="btn btn-small" data-add-faq hidden>+ Add question</button>
+      <p class="hint">Empty rows are ignored. Save to get more empty rows without JavaScript.</p>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">SEO</h2>
+      <div class="field">
+        <label for="seoTitle">SEO title</label>
+        <input id="seoTitle" name="seoTitle" type="text" maxlength="200" value={v.seoTitle} data-count="60" />
+        <p class="hint">Shown in search results. Leave empty to use the title.</p>
+      </div>
+      <div class="field">
+        <label for="metaDescription">Meta description</label>
+        <textarea id="metaDescription" name="metaDescription" maxlength="320" data-count="160">{v.metaDescription}</textarea>
+      </div>
+      <div class="grid grid-2">
+        <div class="field">
+          <label for="primaryKeyword">Primary keyword</label>
+          <input id="primaryKeyword" name="primaryKeyword" type="text" maxlength="120" value={v.primaryKeyword ?? ''} />
+        </div>
+        <div class="field">
+          <label for="relatedKeywords">Related keywords <span class="muted">(comma-separated)</span></label>
+          <input id="relatedKeywords" name="relatedKeywords" type="text" maxlength="1000" value={(v.relatedKeywords ?? []).join(', ')} />
+        </div>
+      </div>
+      <div class="field">
+        <label for="ogTitle">Open Graph title <span class="muted">(social shares; empty = SEO title)</span></label>
+        <input id="ogTitle" name="ogTitle" type="text" maxlength="120" value={v.ogTitle ?? ''} data-count="90" />
+      </div>
+      <div class="field">
+        <label for="ogDescription">Open Graph description <span class="muted">(empty = meta description)</span></label>
+        <textarea id="ogDescription" name="ogDescription" maxlength="300" data-count="200">{v.ogDescription ?? ''}</textarea>
+      </div>
+      <p class="hint">Canonical URL (automatic): <code>{absoluteUrl(`/blog/${v.slug || 'your-slug'}`)}</code> — generated from SITE_URL so it follows your domain.</p>
+      <div class="field">
+        <label for="canonicalUrl">Canonical override <span class="muted">(optional)</span></label>
+        <input id="canonicalUrl" name="canonicalUrl" type="url" maxlength="500" value={v.canonicalUrl} />
+        <p class="hint">Leave empty — the article's own URL is used. Only set this if the article was first published elsewhere.</p>
+      </div>
+      <label class="check"><input type="checkbox" name="noindex" checked={v.noindex} /> Hide from search engines (noindex)</label>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Sources &amp; transparency</h2>
+      <div class="field">
+        <label for="sources">References <span class="muted">(one per line: Title | https://…)</span></label>
+        <textarea id="sources" name="sources">{v.sources.map((s) => `${s.title} | ${s.url}`).join('\n')}</textarea>
+      </div>
+      <label class="check"><input type="checkbox" name="aiAssisted" checked={v.aiAssisted} /> Drafted with AI assistance (shown to readers)</label>
+      <div class="field" style="margin-top:.8rem">
+        <label for="reviewedBy">Reviewed by <span class="muted">(name of the human editor who checked it)</span></label>
+        <input id="reviewedBy" name="reviewedBy" type="text" maxlength="120" value={v.reviewedBy} />
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2 style="margin-top:0">Publish</h2>
+      <p>Status: <span class={`pill pill-${status}`}>{status}</span></p>
+      {article?.publishedAt && <p class="muted">Published {article.publishedAt.slice(0, 16).replace('T', ' ')} UTC</p>}
+      {article?.scheduledFor && <p class="muted">Scheduled for {article.scheduledFor.slice(0, 16).replace('T', ' ')} UTC</p>}
+      <div class="field">
+        <label for="scheduleAt">Schedule for (UTC)</label>
+        <input id="scheduleAt" name="scheduleAt" type="datetime-local" value={toLocal(article?.scheduledFor ?? null)} />
+        <p class="hint">Now: {new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC</p>
+      </div>
+      {status === 'published' && (
+        <label class="check"><input type="checkbox" name="significantUpdate" /> Significant update — show an “Updated” date</label>
+      )}
+      <label class="check"><input type="checkbox" name="featured" checked={v.featured} /> Feature on the homepage</label>
+      <label class="check" style="margin-top:.6rem"><input type="checkbox" name="override" /> <span>Override validation errors <small class="muted">(I have reviewed them; logged)</small></span></label>
+      <div class="toolbar" style="margin-top:1rem">
+        <button class="btn" name="intent" value="save" type="submit">Save</button>
+        <button class="btn" name="intent" value="validate" type="submit">Save &amp; validate</button>
+        {status !== 'review' && status !== 'published' && <button class="btn" name="intent" value="review" type="submit">Submit for review</button>}
+        <button class="btn" name="intent" value="schedule" type="submit">Schedule</button>
+        <button class="btn btn-primary" name="intent" value="publish" type="submit">{status === 'published' ? 'Update live article' : 'Publish now'}</button>
+      </div>
+      <div class="toolbar">
+        {(status === 'published' || status === 'scheduled') && <button class="btn" name="intent" value="draft" type="submit">Unpublish (to draft)</button>}
+        {status !== 'archived' && article && <button class="btn" name="intent" value="archive" type="submit">Archive</button>}
+        {article && <a class="btn" href={`/admin/articles/${article.id}/preview`} target="_blank" rel="noopener">Preview ↗</a>}
+        {article?.status === 'published' && <a class="btn" href={`/blog/${article.slug}`} target="_blank" rel="noopener">View live ↗</a>}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="field">
+        <label for="categoryId">Category</label>
+        <select id="categoryId" name="categoryId">
+          <option value="">— Choose —</option>
+          {categories.map((c) => <option value={c.id} selected={c.id === v.categoryId}>{c.name}</option>)}
+        </select>
+      </div>
+      <div class="field">
+        <label for="authorId">Author</label>
+        <select id="authorId" name="authorId">
+          <option value="">— Choose —</option>
+          {authors.map((a) => <option value={a.id} selected={a.id === v.authorId}>{a.name}</option>)}
+        </select>
+      </div>
+      <div class="field">
+        <label for="tags">Tags <span class="muted">(comma-separated)</span></label>
+        <input id="tags" name="tags" type="text" maxlength="1000" value={v.tags.join(', ')} />
+      </div>
+      <div class="field">
+        <label for="related">Related articles <span class="muted">(slugs, comma-separated)</span></label>
+        <input id="related" name="related" type="text" list="slug-list" value={v.related.join(', ')} />
+        <datalist id="slug-list">{slugs.map((s) => <option value={s} />)}</datalist>
+        <p class="hint">Shown first under “Keep learning”; the rest is filled automatically.</p>
+      </div>
+      <div class="field">
+        <label for="featuredImageId">Featured image</label>
+        <select id="featuredImageId" name="featuredImageId">
+          <option value="">— None —</option>
+          {images.map((i) => <option value={i.id} selected={i.id === v.featuredImageId} data-thumb={`/media/${i.variants[0]?.file}`}>{i.alt.slice(0, 70) || i.fileKey}</option>)}
+        </select>
+        <img id="featured-preview" class="thumb" style="width:100%;height:auto;margin-top:.5rem" alt="" src={currentImage ? `/media/${currentImage.variants[0]?.file}` : ''} hidden={!currentImage} />
+        <p class="hint"><a href="/admin/media">Upload images</a> with alt text and licence details first.</p>
+      </div>
+    </div>
+    <ValidationReport report={report} />
+  </div>
+</form>
+{article && (
+  <form method="post" class="card" style="margin-top:1rem">
+    <input type="hidden" name="_csrf" value={csrf} />
+    <input type="hidden" name="intent" value="delete" />
+    <button class="btn btn-danger" type="submit" data-confirm="Delete this article permanently? This cannot be undone.">Delete article</button>
+  </form>
+)}

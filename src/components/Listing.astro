@@ -1,0 +1,63 @@
+---
+/** Shared article listing (blog index, category pages) with pagination. */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ArticleCard from './ArticleCard.astro';
+import Breadcrumbs from './Breadcrumbs.astro';
+import Pagination from './Pagination.astro';
+import AdSlot from './AdSlot.astro';
+import SearchForm from './SearchForm.astro';
+import type { ArticleCard as Card } from '../lib/repos/articles';
+import type { Category } from '../lib/repos/categories';
+import { breadcrumbLd } from '../lib/seo';
+import { renderMarkdown } from '../lib/content/markdown';
+
+interface Props {
+  title: string;
+  heading: string;
+  description: string;
+  lead: string;
+  eyebrow: string;
+  path: string;
+  base: string;
+  crumbs: { name: string; path: string }[];
+  items: Card[];
+  page: number;
+  totalPages: number;
+  categories: Category[];
+  currentCategory?: string;
+  introMd?: string;
+}
+const p = Astro.props;
+const intro = p.page === 1 && p.introMd ? renderMarkdown(p.introMd).html : '';
+---
+<BaseLayout
+  meta={{ title: p.page > 1 ? `${p.title} — page ${p.page}` : p.title, description: p.description, path: p.path }}
+  structuredData={[breadcrumbLd(p.crumbs)]}
+>
+  <div class="wrap">
+    <Breadcrumbs items={p.crumbs} />
+    <header class="page-header">
+      <span class="eyebrow">{p.eyebrow}</span>
+      <h1>{p.heading}{p.page > 1 && <span class="muted" style="font-size:.5em;font-weight:500"> · page {p.page}</span>}</h1>
+      <p class="lead">{p.lead}</p>
+      {intro && <div class="prose" set:html={intro} />}
+      <SearchForm id="list-q" />
+    </header>
+    <nav aria-label="Categories" style="margin-bottom:2rem">
+      <ul class="chip-list">
+        <li><a class="chip" href="/blog" aria-current={!p.currentCategory ? 'page' : undefined}>All</a></li>
+        {p.categories.filter((c) => (c.publishedCount ?? 0) > 0).map((c) => (
+          <li><a class="chip" href={`/category/${c.slug}`} aria-current={p.currentCategory === c.slug ? 'page' : undefined}>{c.name}</a></li>
+        ))}
+      </ul>
+    </nav>
+    {p.items.length ? (
+      <div class="card-grid card-grid--3">{p.items.map((a, i) => <ArticleCard article={a} headingLevel={2} eager={i === 0 && p.page === 1} />)}</div>
+    ) : (
+      <p class="empty-state">No articles here yet — check back soon, or <a href="/blog">browse all articles</a>.</p>
+    )}
+    <Pagination page={p.page} totalPages={p.totalPages} base={p.base} />
+    {p.items.length >= 6 && <AdSlot position="bottom" />}
+  </div>
+  <div class="section" style="padding-top:1rem"></div>
+</BaseLayout>

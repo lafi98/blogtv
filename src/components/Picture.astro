@@ -1,0 +1,27 @@
+---
+import type { ImageRecord } from '../lib/repos/images';
+import { srcset } from '../lib/images/process';
+
+interface Props {
+  image: ImageRecord;
+  sizes: string;
+  eager?: boolean;
+  alt?: string;
+  class?: string;
+}
+const { image, sizes, eager = false, alt, class: className } = Astro.props;
+const largest = image.variants[image.variants.length - 1];
+const fallback = image.variants.find((v) => v.w >= 800) ?? largest;
+---
+<img
+  class={className}
+  src={`/media/${fallback.file}`}
+  srcset={srcset(image.variants)}
+  sizes={sizes}
+  width={largest.w}
+  height={largest.h}
+  alt={alt ?? image.alt}
+  loading={eager ? 'eager' : 'lazy'}
+  decoding={eager ? 'sync' : 'async'}
+  fetchpriority={eager ? 'high' : 'auto'}
+/>

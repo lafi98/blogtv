@@ -1,0 +1,32 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Breadcrumbs from './Breadcrumbs.astro';
+import { renderContentPage } from '../lib/content/pages';
+import { breadcrumbLd } from '../lib/seo';
+
+interface Props {
+  file: string;
+  title: string;
+  description: string;
+  path: string;
+  eyebrow?: string;
+  lead?: string;
+}
+const { file, title, description, path, eyebrow, lead } = Astro.props;
+const { html } = renderContentPage(file);
+const crumbs = [{ name: 'Home', path: '/' }, { name: title, path }];
+---
+<BaseLayout meta={{ title, description, path }} structuredData={[breadcrumbLd(crumbs)]}>
+  <div class="wrap">
+    <Breadcrumbs items={crumbs} />
+    <header class="page-header">
+      {eyebrow && <span class="eyebrow">{eyebrow}</span>}
+      <h1>{title}</h1>
+      {lead && <p class="lead">{lead}</p>}
+    </header>
+    <div class="prose" style="padding-bottom:4rem">
+      <Fragment set:html={html} />
+      <slot />
+    </div>
+  </div>
+</BaseLayout>

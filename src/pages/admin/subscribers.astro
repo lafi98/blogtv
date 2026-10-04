@@ -1,0 +1,35 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { deleteSubscriber, listSubscribers } from '../../lib/repos/subscribers';
+import { audit } from '../../lib/db';
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const id = Number(fd.get('id')) || 0;
+  if (id && fd.get('intent') === 'delete') {
+    deleteSubscriber(id);
+    audit('subscriber.deleted', { userId: Astro.locals.user!.id, entityId: id });
+  }
+  return Astro.redirect('/admin/subscribers', 303);
+}
+const subs = listSubscribers();
+const confirmed = subs.filter((s) => s.status === 'confirmed').length;
+const csrf = Astro.locals.csrfToken;
+---
+<AdminLayout title="Subscribers">
+  <div class="toolbar"><h1 style="margin:0">Newsletter subscribers</h1><span class="spacer"></span><a class="btn" href="/admin/subscribers.csv">Export confirmed (CSV)</a></div>
+  <p class="muted">{confirmed} confirmed · {subs.length} total. Only confirmed (double opt-in) subscribers should receive emails. Delete records on request (right to erasure).</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Email</th><th>Status</th><th>Signed up</th><th>Confirmed</th><th></th></tr></thead>
+      <tbody>
+        {subs.map((s) => (
+          <tr>
+            <td>{s.email}</td><td>{s.status}</td><td>{s.createdAt.slice(0, 10)}</td><td>{s.confirmedAt?.slice(0, 10) ?? '—'}</td>
+            <td><form method="post"><input type="hidden" name="_csrf" value={csrf} /><input type="hidden" name="id" value={s.id} /><button class="btn btn-small btn-danger" name="intent" value="delete" data-confirm="Delete this subscriber record?">Delete</button></form></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</AdminLayout>

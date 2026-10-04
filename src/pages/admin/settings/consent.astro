@@ -1,0 +1,54 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getSettings, saveSettings } from '../../../lib/settings';
+import { setFlash } from '../../../lib/admin/flash';
+import { audit } from '../../../lib/db';
+
+const c = getSettings('consent');
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const mode = String(fd.get('mode'));
+  const cmp = String(fd.get('cmp'));
+  const bannerText = String(fd.get('bannerText') ?? '').trim().slice(0, 600);
+  if (!['opt-in', 'opt-out', 'notice'].includes(mode) || !['builtin', 'external'].includes(cmp) || bannerText.length < 20) {
+    setFlash(Astro.cookies, 'error', 'Invalid settings.');
+  } else {
+    saveSettings('consent', {
+      mode: mode as typeof c.mode,
+      cmp: cmp as typeof c.cmp,
+      policyVersion: fd.get('bumpVersion') === 'on' ? c.policyVersion + 1 : c.policyVersion,
+      respectGlobalPrivacyControl: fd.get('gpc') === 'on',
+      googleConsentMode: fd.get('gcm') === 'on',
+      bannerText,
+    });
+    audit('settings.consent', { userId: Astro.locals.user!.id, details: `${mode}/${cmp}` });
+    setFlash(Astro.cookies, 'success', 'Consent settings saved.');
+  }
+  return Astro.redirect('/admin/settings/consent', 303);
+}
+const csrf = Astro.locals.csrfToken;
+---
+<AdminLayout title="Cookies & consent">
+  <h1>Cookies &amp; consent</h1>
+  <div class="card">
+    <p>Choose the model that matches the laws that apply to your visitors and your services. This tool helps you implement a choice; it does not by itself make the site legally compliant. When in doubt, use <strong>opt-in</strong>.</p>
+    <p class="muted">Google requires publishers serving ads to users in the EEA, the UK and Switzerland to use a Google-certified consent management platform (CMP) integrated with the IAB TCF. If you serve ads there, select “External certified CMP” and set one up (for example AdSense → Privacy &amp; messaging).</p>
+  </div>
+  <form method="post" class="card">
+    <input type="hidden" name="_csrf" value={csrf} />
+    <fieldset class="field"><legend><strong>Consent model</strong></legend>
+      <label class="check"><input type="radio" name="mode" value="opt-in" checked={c.mode === 'opt-in'} /> Opt-in — nothing optional loads until the visitor agrees (EEA/UK-style; safest default)</label>
+      <label class="check"><input type="radio" name="mode" value="opt-out" checked={c.mode === 'opt-out'} /> Opt-out — optional tech loads unless the visitor objects (some US-state models)</label>
+      <label class="check"><input type="radio" name="mode" value="notice" checked={c.mode === 'notice'} /> Notice only — informational banner (only appropriate where no consent is legally required)</label>
+    </fieldset>
+    <fieldset class="field"><legend><strong>Advertising consent handled by</strong></legend>
+      <label class="check"><input type="radio" name="cmp" value="builtin" checked={c.cmp === 'builtin'} /> This site's built-in banner</label>
+      <label class="check"><input type="radio" name="cmp" value="external" checked={c.cmp === 'external'} /> External certified CMP (the built-in banner then only manages analytics; AdSense loads and the CMP asks for ad consent)</label>
+    </fieldset>
+    <label class="check"><input type="checkbox" name="gpc" checked={c.respectGlobalPrivacyControl} /> Treat Global Privacy Control as an opt-out of advertising cookies</label>
+    <label class="check"><input type="checkbox" name="gcm" checked={c.googleConsentMode} /> Send Google Consent Mode v2 signals</label>
+    <div class="field" style="margin-top:1rem"><label for="bannerText">Banner text</label><textarea id="bannerText" name="bannerText" maxlength="600">{c.bannerText}</textarea></div>
+    <label class="check"><input type="checkbox" name="bumpVersion" /> Ask everyone again (bump policy version — current v{c.policyVersion})</label>
+    <p style="margin-top:1rem"><button class="btn btn-primary" type="submit">Save</button></p>
+  </form>
+</AdminLayout>

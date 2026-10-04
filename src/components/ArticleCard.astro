@@ -1,0 +1,30 @@
+---
+import type { ArticleCard } from '../lib/repos/articles';
+import { formatDate } from '../lib/content/text';
+import Picture from './Picture.astro';
+
+interface Props {
+  article: ArticleCard;
+  variant?: 'default' | 'featured';
+  headingLevel?: 2 | 3;
+  eager?: boolean;
+}
+const { article: a, variant = 'default', headingLevel = 3, eager = false } = Astro.props;
+const Heading = `h${headingLevel}` as 'h2' | 'h3';
+const sizes = variant === 'featured' ? '(min-width: 860px) 640px, 100vw' : '(min-width: 1000px) 360px, (min-width: 640px) 50vw, 100vw';
+---
+<article class={`card ${variant === 'featured' ? 'card--featured' : ''}`}>
+  <div class="card-media">
+    {a.image && <Picture image={a.image} sizes={sizes} eager={eager} alt="" />}
+  </div>
+  <div class="card-body">
+    {a.categorySlug && <a class="card-cat" href={`/category/${a.categorySlug}`}>{a.categoryName}</a>}
+    <Heading class="card-title"><a href={`/blog/${a.slug}`}>{a.title}</a></Heading>
+    <p class="card-excerpt">{a.excerpt}</p>
+    <p class="card-meta">
+      {a.publishedAt && <span>{a.contentUpdatedAt ? 'Updated ' : ''}<time datetime={a.contentUpdatedAt ?? a.publishedAt}>{formatDate(a.contentUpdatedAt ?? a.publishedAt)}</time></span>}
+      <span>{a.readingMinutes} min read</span>
+      {a.authorName && <span>By {a.authorName}</span>}
+    </p>
+  </div>
+</article>

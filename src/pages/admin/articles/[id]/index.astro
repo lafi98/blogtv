@@ -1,0 +1,26 @@
+---
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import ArticleEditor from '../../../../components/admin/ArticleEditor.astro';
+import { handleArticlePost } from '../../../../lib/admin/articleActions';
+import { getArticle, type ArticleInput } from '../../../../lib/repos/articles';
+import type { ValidationReport } from '../../../../lib/publishing/validator';
+
+const id = Number(Astro.params.id);
+const article = Number.isInteger(id) && id > 0 ? getArticle(id) : null;
+if (!article) return new Response('Article not found', { status: 404 });
+
+let values: ArticleInput = { ...article };
+let errors: string[] = [];
+let report: ValidationReport | null = article.validation;
+if (Astro.request.method === 'POST') {
+  const res = await handleArticlePost(await Astro.request.formData(), article, Astro.locals.user!, Astro.cookies);
+  if (res.redirect) return Astro.redirect(res.redirect, 303);
+  errors = res.errors ?? [];
+  report = res.report ?? report;
+  if (res.values) values = res.values;
+}
+---
+<AdminLayout title={`Edit: ${article.title}`}>
+  <h1>Edit article</h1>
+  <ArticleEditor article={article} values={values} errors={errors} report={report} />
+</AdminLayout>

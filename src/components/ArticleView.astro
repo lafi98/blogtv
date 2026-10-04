@@ -1,0 +1,133 @@
+---
+/** Full article body — shared by the public article page and the admin preview. */
+import Breadcrumbs from './Breadcrumbs.astro';
+import Picture from './Picture.astro';
+import Toc from './Toc.astro';
+import Faq from './Faq.astro';
+import AuthorBox from './AuthorBox.astro';
+import ShareButtons from './ShareButtons.astro';
+import AdSlot from './AdSlot.astro';
+import ArticleCard from './ArticleCard.astro';
+import NewsletterForm from './NewsletterForm.astro';
+import type { Article, ArticleCard as Card } from '../lib/repos/articles';
+import type { Author } from '../lib/repos/authors';
+import type { ImageRecord } from '../lib/repos/images';
+import { renderArticle } from '../lib/content/render';
+import { formatDate } from '../lib/content/text';
+import { absoluteUrl } from '../lib/config';
+import { adRuntime } from '../lib/ads';
+import { getSettings } from '../lib/settings';
+
+interface Props {
+  article: Article;
+  author: Author | null;
+  image: ImageRecord | null;
+  related: Card[];
+  adsEnabled: boolean;
+  preview?: boolean;
+}
+const { article: a, author, image, related, adsEnabled, preview = false } = Astro.props;
+const rendered = renderArticle(a, { cache: !preview });
+const ads = adRuntime();
+const inContentAfter = a.wordCount >= ads.minWordsForInContent && rendered.sections.length >= 4 ? 2 : -1;
+const url = absoluteUrl(`/blog/${a.slug}`);
+const crumbs = [
+  { name: 'Home', path: '/' },
+  { name: 'Blog', path: '/blog' },
+  ...(a.categorySlug ? [{ name: a.categoryName ?? '', path: `/category/${a.categorySlug}` }] : []),
+  { name: a.title, path: `/blog/${a.slug}` },
+];
+const initials = (author?.name ?? 'HH').split(/\s+/).filter((w) => /^[A-Za-z]/.test(w)).slice(0, 2).map((w) => w[0]).join('');
+const site = getSettings('site');
+---
+<div class="wrap">
+  <Breadcrumbs items={crumbs} />
+  <header class="article-header">
+    {a.categorySlug && <a class="card-cat" href={`/category/${a.categorySlug}`}>{a.categoryName}</a>}
+    <h1>{a.title}</h1>
+    <p class="lead">{a.excerpt}</p>
+    <div class="article-meta">
+      {author && (
+        <span class="byline"><span class="avatar" aria-hidden="true">{initials}</span> By {author.name}</span>
+      )}
+      {a.publishedAt && <span>Published <time datetime={a.publishedAt}>{formatDate(a.publishedAt)}</time></span>}
+      {a.contentUpdatedAt && <span>Updated <time datetime={a.contentUpdatedAt}>{formatDate(a.contentUpdatedAt)}</time></span>}
+      <span>{a.readingMinutes} min read</span>
+    </div>
+  </header>
+  {image && (
+    <figure class="article-hero">
+      <Picture image={image} sizes="(min-width: 940px) 880px, 100vw" eager />
+    </figure>
+  )}
+  <AdSlot position="top" enabled={adsEnabled} />
+  <div class="article-layout">
+    <article class="prose" id="article-body">
+      {rendered.toc.length >= 3 && (
+        <details class="toc-mobile">
+          <summary>On this page</summary>
+          <Toc items={rendered.toc} id="toc-mobile-heading" />
+        </details>
+      )}
+      {rendered.sections.map((html, i) => (
+        <>
+          <Fragment set:html={html} />
+          {i === inContentAfter && <AdSlot position="in-content" enabled={adsEnabled} />}
+        </>
+      ))}
+      <Faq items={a.faq} />
+      {a.sources.length > 0 && (
+        <section class="sources" aria-labelledby="sources-heading">
+          <h2 id="sources-heading">References</h2>
+          <ul>{a.sources.map((s) => <li><a href={s.url} rel="noopener" class="external">{s.title || s.url}</a></li>)}</ul>
+        </section>
+      )}
+      {a.tags.length > 0 && (
+        <ul class="tag-list" aria-label="Topics">
+          {a.tags.map((t) => <li><a href={`/search?q=${encodeURIComponent(t)}`}>#{t}</a></li>)}
+        </ul>
+      )}
+      <div class="disclosure">
+        {a.aiAssisted ? (
+          <p>
+            <strong>How this guide was made:</strong> drafted with AI assistance{a.reviewedBy ? `, then reviewed and edited by ${a.reviewedBy}` : ' and checked with our editorial accuracy and quality checks'}.
+            Found something that doesn’t look right? <a href="/contact">Tell us</a> and we’ll correct it.
+          </p>
+        ) : (
+          <p>Found something that doesn’t look right? <a href="/contact">Tell us</a> and we’ll correct it. <a href="/about#editorial-standards">Our editorial standards</a>.</p>
+        )}
+      </div>
+      <ShareButtons url={url} title={a.title} image={image?.ogFile ? absoluteUrl(`/media/${image.ogFile}`) : undefined} />
+      {author && <AuthorBox author={author} />}
+    </article>
+    <aside class="article-aside" aria-label="Article sidebar">
+      <div class="aside-sticky">
+        <Toc items={rendered.toc} id="toc-heading" />
+        <AdSlot position="sidebar" enabled={adsEnabled} />
+      </div>
+    </aside>
+  </div>
+  <AdSlot position="bottom" enabled={adsEnabled} />
+</div>
+
+{related.length > 0 && (
+  <section class="section section--tint" aria-labelledby="related-heading">
+    <div class="wrap">
+      <div class="section-head"><h2 id="related-heading">Keep learning</h2></div>
+      <div class="card-grid card-grid--3">{related.map((r) => <ArticleCard article={r} />)}</div>
+    </div>
+  </section>
+)}
+{site.newsletterEnabled && (
+  <section class="section" aria-labelledby="nl-heading">
+    <div class="wrap">
+      <div class="panel newsletter-panel split">
+        <div>
+          <h2 id="nl-heading">Enjoyed this guide?</h2>
+          <p>Get new tutorials and patterns by email. No spam — unsubscribe any time.</p>
+        </div>
+        <NewsletterForm idPrefix="article-nl" />
+      </div>
+    </div>
+  </section>
+)}

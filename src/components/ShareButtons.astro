@@ -1,0 +1,24 @@
+---
+import Icon from './Icon.astro';
+interface Props {
+  url: string;
+  title: string;
+  image?: string;
+}
+const { url, title, image } = Astro.props;
+const e = encodeURIComponent;
+const links = [
+  { name: 'Pinterest', icon: 'pinterest', href: `https://www.pinterest.com/pin/create/button/?url=${e(url)}&description=${e(title)}${image ? `&media=${e(image)}` : ''}` },
+  { name: 'Facebook', icon: 'facebook', href: `https://www.facebook.com/sharer/sharer.php?u=${e(url)}` },
+  { name: 'X', icon: 'x', href: `https://x.com/intent/post?url=${e(url)}&text=${e(title)}` },
+  { name: 'WhatsApp', icon: 'whatsapp', href: `https://wa.me/?text=${e(`${title} ${url}`)}` },
+];
+---
+<div class="share" role="group" aria-labelledby="share-label">
+  <span class="share-label" id="share-label">Share this guide:</span>
+  {links.map((l) => (
+    <a href={l.href} target="_blank" rel="noopener noreferrer"><Icon name={l.icon} /> {l.name}<span class="visually-hidden"> (opens in a new tab)</span></a>
+  ))}
+  <a href={`mailto:?subject=${e(title)}&body=${e(url)}`}><Icon name="mail" /> Email</a>
+  <button type="button" data-copy-link={url} hidden><Icon name="link" /> Copy link</button>
+</div>

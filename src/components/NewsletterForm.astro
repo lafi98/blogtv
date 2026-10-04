@@ -1,0 +1,32 @@
+---
+import { getSettings } from '../lib/settings';
+import { HONEYPOT_FIELD, issueFormToken } from '../lib/security/forms';
+import { config } from '../lib/config';
+
+interface Props {
+  idPrefix?: string;
+  compact?: boolean;
+}
+const { idPrefix = 'nl', compact = false } = Astro.props;
+const site = getSettings('site');
+const token = issueFormToken();
+---
+{site.newsletterEnabled && (
+  <form class="newsletter-form" action="/newsletter" method="post">
+    <input type="hidden" name="form_token" value={token} />
+    <div class="hp-field" aria-hidden="true">
+      <label for={`${idPrefix}-${HONEYPOT_FIELD}`}>Leave this field empty</label>
+      <input id={`${idPrefix}-${HONEYPOT_FIELD}`} type="text" name={HONEYPOT_FIELD} tabindex="-1" autocomplete="off" />
+    </div>
+    <label for={`${idPrefix}-email`} class={compact ? 'visually-hidden' : ''}>Email address</label>
+    <div class="newsletter-row">
+      <input id={`${idPrefix}-email`} type="email" name="email" required autocomplete="email" placeholder="you@example.com" maxlength="254" />
+      <button class="btn btn-primary" type="submit">Subscribe</button>
+    </div>
+    <label class="check small-print" for={`${idPrefix}-consent`}>
+      <input id={`${idPrefix}-consent`} type="checkbox" name="consent" value="yes" required />
+      <span>Yes, email me new crochet tutorials and patterns (roughly weekly). I can unsubscribe at any time. See our <a href="/privacy-policy">Privacy Policy</a>.</span>
+    </label>
+    {config.turnstile.enabled && <div class="cf-turnstile" data-sitekey={config.turnstile.siteKey}></div>}
+  </form>
+)}

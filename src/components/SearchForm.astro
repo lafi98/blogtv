@@ -1,0 +1,14 @@
+---
+import Icon from './Icon.astro';
+interface Props {
+  value?: string;
+  id?: string;
+  label?: string;
+}
+const { value = '', id = 'q', label = 'Search articles' } = Astro.props;
+---
+<form class="search-form" action="/search" method="get" role="search">
+  <label for={id} class="visually-hidden">{label}</label>
+  <input id={id} type="search" name="q" value={value} placeholder="Search stitches, patterns, tips…" maxlength="100" autocomplete="off" />
+  <button class="btn btn-primary" type="submit"><Icon name="search" size={18} /> Search</button>
+</form>

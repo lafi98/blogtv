@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420" role="img" aria-labelledby="t d">
+  <title id="t">Front loop and back loop of a crochet stitch</title>
+  <desc id="d">Looking down at the top of a row, each stitch has a V-shaped top made of two strands. The strand nearer to you is the front loop; the strand farther away is the back loop. Normally you insert the hook under both loops.</desc>
+  <style>
+    .lbl{font:600 18px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+    .small{font:400 15px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#675850}
+    .title{font:700 22px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#2d2420}
+  </style>
+  <rect width="760" height="420" fill="#faf6f0"/>
+  <text x="380" y="38" text-anchor="middle" class="title">The top of a row, seen from above</text>
+  <!-- fabric below the tops -->
+  <rect x="70" y="210" width="620" height="110" rx="12" fill="#e3d6c6"/>
+  <g stroke="#cdbba6" stroke-width="10" stroke-linecap="round">
+    <path d="M130 230 L130 305"/><path d="M220 230 L220 305"/><path d="M310 230 L310 305"/><path d="M400 230 L400 305"/><path d="M490 230 L490 305"/><path d="M580 230 L580 305"/><path d="M640 230 L640 305"/>
+  </g>
+  <!-- row of V tops (chain-like) -->
+  <g fill="none" stroke="#b9a58e" stroke-width="12" stroke-linecap="round">
+    <path d="M90 170 Q130 140 170 170 Q130 200 90 170"/>
+    <path d="M180 170 Q220 140 260 170 Q220 200 180 170"/>
+    <path d="M360 170 Q400 140 440 170 Q400 200 360 170"/>
+    <path d="M450 170 Q490 140 530 170 Q490 200 450 170"/>
+    <path d="M540 170 Q580 140 620 170 Q580 200 540 170"/>
+    <path d="M630 170 Q660 148 690 170 Q660 192 630 170"/>
+  </g>
+  <!-- highlighted stitch -->
+  <path d="M270 170 Q310 140 350 170" fill="none" stroke="#5f7556" stroke-width="13" stroke-linecap="round"/>
+  <path d="M270 170 Q310 200 350 170" fill="none" stroke="#a3482a" stroke-width="13" stroke-linecap="round"/>
+  <!-- labels -->
+  <path d="M310 150 L310 95" stroke="#5f7556" stroke-width="3"/>
+  <text x="310" y="85" text-anchor="middle" class="lbl" fill="#4f6447">Back loop (BLO)</text>
+  <text x="310" y="65" text-anchor="middle" class="small">farther from you</text>
+  <path d="M330 190 L430 360" stroke="#a3482a" stroke-width="3"/>
+  <text x="440" y="372" class="lbl" fill="#a3482a">Front loop (FLO)</text>
+  <text x="440" y="394" class="small">closer to you</text>
+  <text x="70" y="372" class="small">Unless the pattern says otherwise,</text>
+  <text x="70" y="394" class="small">insert the hook under both loops.</text>
+</svg>

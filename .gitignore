@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+
+# Build output and caches
+dist/
+build/
+.astro/
+.vite/
+.cache/
+coverage/
+*.tsbuildinfo
+.eslintcache
+
+# Runtime data: SQLite database, uploads, backups, dev secret (all live in data/)
+data/
+
+# Local databases anywhere in the tree
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Environment files: real secrets never go in git (only the template is committed)
+.env
+.env.*
+!.env.example
+
+# Keys, certificates and other secrets
+.dev-secret
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+.npmrc
+secrets/
+.secrets/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

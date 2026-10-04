@@ -1,0 +1,78 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { countByStatus, listAdminArticles } from '../../lib/repos/articles';
+import DailyPublisherPanel from '../../components/admin/DailyPublisherPanel.astro';
+import { countNewMessages } from '../../lib/repos/messages';
+import { getSettings, ADSENSE_CLIENT_RE } from '../../lib/settings';
+import { adRuntime } from '../../lib/ads';
+import { config } from '../../lib/config';
+import { getDb } from '../../lib/db';
+
+const counts = countByStatus();
+const site = getSettings('site');
+const ads = getSettings('ads');
+const automation = getSettings('automation');
+const consent = getSettings('consent');
+const rt = adRuntime();
+const review = listAdminArticles({ status: 'review', limit: 5, offset: 0 }).items;
+const scheduled = listAdminArticles({ status: 'scheduled', limit: 5, offset: 0 }).items;
+const failing = (getDb().prepare("SELECT COUNT(*) n FROM articles WHERE status = 'published' AND validation_status = 'fail'").get() as { n: number }).n;
+const authorsGeneric = (getDb().prepare("SELECT COUNT(*) n FROM authors WHERE slug = 'editorial-team'").get() as { n: number }).n > 0;
+const aiUnreviewed = (getDb().prepare("SELECT COUNT(*) n FROM articles WHERE status = 'published' AND ai_assisted = 1 AND reviewed_by = ''").get() as { n: number }).n;
+
+const readiness = [
+  { ok: counts.published >= 20, text: `At least ~20 substantial, original published articles before applying for AdSense (you have ${counts.published}). Google sets no fixed number — quality and usefulness matter most.` },
+  { ok: aiUnreviewed === 0, text: `Every AI-assisted article reviewed by a person (${aiUnreviewed} published without a named reviewer).` },
+  { ok: failing === 0, text: `No published article fails validation (${failing} failing).` },
+  { ok: Boolean(site.operatorName), text: 'Operator / legal name set (Settings → Site) — used in the legal pages.' },
+  { ok: Boolean(site.contactEmail), text: 'Contact email set (Settings → Site).' },
+  { ok: Boolean(site.jurisdiction), text: 'Jurisdiction set for the Terms (Settings → Site).' },
+  { ok: !authorsGeneric, text: 'Real author profile(s) with genuine background, instead of only the generic editorial byline (Authors).' },
+  { ok: config.siteUrl.startsWith('https://'), text: `SITE_URL uses https (currently ${config.siteUrl}).` },
+  { ok: config.allowIndexing, text: 'ALLOW_INDEXING=true on the production server (currently search engines are blocked).' },
+  { ok: config.isProd ? Boolean(process.env.APP_SECRET) : true, text: 'APP_SECRET set in production.' },
+  { ok: ADSENSE_CLIENT_RE.test(ads.clientId), text: 'AdSense publisher ID entered (Settings → Advertising) — only once Google has given you one.' },
+  { ok: consent.cmp === 'external' || !rt.live, text: 'If serving ads to EEA/UK/Swiss visitors: a Google-certified CMP is in place (Settings → Cookies & consent).' },
+];
+---
+<AdminLayout title="Dashboard">
+  <h1>Dashboard</h1>
+  <DailyPublisherPanel compact />
+  <div class="grid grid-4">
+    <div class="card"><div class="stat">{counts.published}</div><div class="stat-label">Published</div></div>
+    <div class="card"><div class="stat">{counts.review}</div><div class="stat-label"><a href="/admin/articles?status=review">Awaiting review</a></div></div>
+    <div class="card"><div class="stat">{counts.scheduled}</div><div class="stat-label"><a href="/admin/articles?status=scheduled">Scheduled</a></div></div>
+    <div class="card"><div class="stat">{counts.draft}</div><div class="stat-label"><a href="/admin/articles?status=draft">Drafts</a></div></div>
+  </div>
+
+  <div class="grid grid-2">
+    <section class="card" aria-labelledby="sys-h">
+      <h2 id="sys-h" style="margin-top:0">System status</h2>
+      <ul>
+        <li>Advertising: <strong>{rt.live ? 'LIVE' : 'off'}</strong>{!rt.live && <span class="muted"> — {rt.reason}</span>}</li>
+        <li>Daily AI publishing: <strong>{automation.dailyEnabled ? `ON at ${automation.publishTime} (${automation.timezone})` : 'OFF'}</strong></li>
+        <li>Consent mode: <strong>{consent.mode}</strong> ({consent.cmp === 'external' ? 'external CMP' : 'built-in banner'})</li>
+        <li>Search engine indexing: <strong>{config.allowIndexing ? 'allowed' : 'blocked (ALLOW_INDEXING=false)'}</strong></li>
+        <li>New messages: <strong>{countNewMessages()}</strong></li>
+      </ul>
+    </section>
+    <section class="card" aria-labelledby="ready-h">
+      <h2 id="ready-h" style="margin-top:0">Launch &amp; AdSense readiness</h2>
+      <ul class="readiness">{readiness.map((r) => <li class={r.ok ? 'ok' : 'todo'}>{r.text}</li>)}</ul>
+      <p class="muted" style="font-size:.85rem">This checklist helps you follow Google's published requirements. It cannot guarantee approval — that decision is Google's.</p>
+    </section>
+  </div>
+
+  <div class="grid grid-2">
+    <section class="card" aria-labelledby="rev-h">
+      <h2 id="rev-h" style="margin-top:0">Awaiting your review</h2>
+      {review.length ? <ul>{review.map((a) => <li><a href={`/admin/articles/${a.id}`}>{a.title}</a> <span class={`pill pill-${a.validationStatus ?? 'warn'}`}>{a.validationStatus ?? 'unchecked'}</span></li>)}</ul> : <p class="muted">Nothing waiting.</p>}
+      <h2>Scheduled</h2>
+      {scheduled.length ? <ul>{scheduled.map((a) => <li><a href={`/admin/articles/${a.id}`}>{a.title}</a> — {a.scheduledFor?.slice(0, 16).replace('T', ' ')} UTC</li>)}</ul> : <p class="muted">Nothing scheduled.</p>}
+    </section>
+    <section class="card" aria-labelledby="ai-h">
+      <h2 id="ai-h" style="margin-top:0">AI-generated articles</h2>
+      <p>Drafts created by the AI Publisher appear under <a href="/admin/articles?status=draft">Drafts</a> with their validation errors. Every run is in the <a href="/admin/runs">AI run log</a>.</p>
+    </section>
+  </div>
+</AdminLayout>

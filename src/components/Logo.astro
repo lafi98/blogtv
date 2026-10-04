@@ -1,0 +1,20 @@
+---
+interface Props {
+  name: string;
+}
+const { name } = Astro.props;
+const parts = name.split(/\s(&|and)\s/);
+---
+<a href="/" class="brand" aria-label={`${name} — home`}>
+  <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+    <circle cx="22" cy="26" r="17" fill="#c4664b" />
+    <g fill="none" stroke="#7a3520" stroke-opacity=".45" stroke-width="2">
+      <path d="M7 22c8 0 18 3 27 12" /><path d="M10 14c6 2 13 9 15 23" /><path d="M20 9.5c-2 7-1 18 4 27" /><path d="M6 31c7-3 16-3 26 1" />
+    </g>
+    <path d="M30 38L44 8" stroke="#e8b86f" stroke-width="4" stroke-linecap="round" />
+    <path d="M44 8c1.5-2 3.6-1.2 3 .6" fill="none" stroke="#e8b86f" stroke-width="2.6" stroke-linecap="round" />
+  </svg>
+  <span class="brand-name">
+    {parts.length === 3 ? (<>{parts[0]} <span class="amp">&amp;</span> {parts[2]}</>) : name}
+  </span>
+</a>

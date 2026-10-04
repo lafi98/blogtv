@@ -1,0 +1,36 @@
+---
+import Icon from './Icon.astro';
+import type { Category } from '../lib/repos/categories';
+interface Props {
+  categories: Category[];
+}
+const { categories } = Astro.props;
+const look: Record<string, { icon: string; bg: string; fg: string }> = {
+  'crochet-for-beginners': { icon: 'yarn', bg: '#f6e1d6', fg: '#a3482a' },
+  'crochet-patterns': { icon: 'pattern', bg: '#e4eadc', fg: '#4f6447' },
+  'crochet-tutorials': { icon: 'hook', bg: '#f6ebcf', fg: '#7a5a12' },
+  'crochet-stitches': { icon: 'stitches', bg: '#e2e9ef', fg: '#33566e' },
+  'crochet-bags': { icon: 'bag', bg: '#f6e4e0', fg: '#8c3f47' },
+  'crochet-home-decor': { icon: 'home', bg: '#ece0ea', fg: '#6f4567' },
+  'crochet-gifts': { icon: 'gift', bg: '#f6e1d6', fg: '#a3482a' },
+  'crochet-for-kids': { icon: 'star', bg: '#f6ebcf', fg: '#7a5a12' },
+  'seasonal-crochet': { icon: 'leaf', bg: '#e4eadc', fg: '#4f6447' },
+  'crochet-tips': { icon: 'bulb', bg: '#e2e9ef', fg: '#33566e' },
+};
+---
+<ul class="cat-grid">
+  {categories.map((c) => {
+    const l = look[c.slug] ?? { icon: 'yarn', bg: '#f3ebdf', fg: '#4a3e37' };
+    return (
+      <li>
+        <a class="cat-tile" href={`/category/${c.slug}`}>
+          <span class="cat-icon" style={`background:${l.bg};color:${l.fg}`}><Icon name={l.icon} /></span>
+          <span>
+            <strong>{c.name}</strong>
+            <span>{c.publishedCount ?? 0} {c.publishedCount === 1 ? 'article' : 'articles'}</span>
+          </span>
+        </a>
+      </li>
+    );
+  })}
+</ul>

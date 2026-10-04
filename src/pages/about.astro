@@ -1,0 +1,26 @@
+---
+import ContentPage from '../components/ContentPage.astro';
+import { listAuthors } from '../lib/repos/authors';
+import { getSettings } from '../lib/settings';
+const site = getSettings('site');
+const authors = listAuthors();
+---
+<ContentPage file="pages/about.md" title={`About ${site.name}`} eyebrow="About us" path="/about"
+  lead={site.tagline}
+  description={`Who writes ${site.name}, what we publish, and the editorial standards behind our crochet tutorials and patterns.`}>
+  {authors.length > 0 && (
+    <section aria-labelledby="authors-heading">
+      <h2 id="authors-heading">Who writes here</h2>
+      {authors.map((a) => (
+        <div class="author-box" id={`author-${a.slug}`}>
+          <div>
+            <h3 style="margin:0 0 .2rem">{a.name}</h3>
+            {a.role && <p class="role muted">{a.role}</p>}
+            <p>{a.bio}</p>
+            {a.websiteUrl && <p><a href={a.websiteUrl} rel="noopener">Website</a></p>}
+          </div>
+        </div>
+      ))}
+    </section>
+  )}
+</ContentPage>
